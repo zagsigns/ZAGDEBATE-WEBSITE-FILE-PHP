@@ -1,0 +1,14 @@
+Options -Indexes
+AddDefaultCharset utf-8
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# Force HTTPS if available (optional)
+RewriteCond %{HTTPS} !=on
+# Uncomment next line if you have SSL configured
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Increase upload size if hosting allows
+php_value upload_max_filesize 16M
+php_value post_max_size 16M
