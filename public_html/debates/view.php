@@ -1,5 +1,4 @@
 <?php
-// Enable detailed error reporting during development
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -7,7 +6,6 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/app.php';
 
-// Fetch debate by ID
 $id = (int)($_GET['id'] ?? 0);
 $stmt = $pdo->prepare("SELECT d.*, u.name AS creator_name, u.id AS creator_id 
                        FROM debates d 
@@ -22,19 +20,16 @@ if (!$debate) {
   exit;
 }
 
-// Decode gallery JSON safely
 $gallery = [];
 if (!empty($debate['gallery_json'])) {
   $gallery = json_decode($debate['gallery_json'], true) ?: [];
 }
 
-// Session user and role checks
 $user = current_user();
 $isLoggedIn = $user && !empty($user['id']);
 $isAdmin = $isLoggedIn && is_admin($user);
 $isCreator = $isLoggedIn && ($debate['creator_id'] == $user['id']);
 
-// Joined status
 $joined = false;
 if ($isLoggedIn) {
   $j = $pdo->prepare("SELECT id FROM debate_participants WHERE debate_id=? AND user_id=?");
@@ -42,26 +37,41 @@ if ($isLoggedIn) {
   $joined = (bool)$j->fetch();
 }
 
-// Settings
 $settings = get_settings($pdo) ?: [];
-$access_mode = $settings['debate_access_mode'] ?? 'free'; // 'free' or 'credits'
+$access_mode = $settings['debate_access_mode'] ?? 'free';
 $credits_required = (int)($settings['credits_to_join'] ?? 0);
 $credit_rate = (float)($settings['credit_usd_rate'] ?? 0.10);
+$free_join_limit = (int)($settings['free_join_limit'] ?? 0);
+$free_join_per_debate = (int)($settings['free_join_per_debate'] ?? 0);
+$free_join_time_minutes = (int)($settings['free_join_time_minutes'] ?? 0);
 
 $success = '';
 $error = '';
 
-// Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLoggedIn) {
   if ($_POST['action'] === 'join' && !$joined) {
-    // Admins/creators join free, or when mode is not credits / cost <= 0
-    if ($isAdmin || $isCreator || $access_mode !== 'credits' || $credits_required <= 0) {
-      $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")
-          ->execute([$id, (int)$user['id']]);
+    $joinedCountStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE user_id=?");
+    $joinedCountStmt->execute([(int)$user['id']]);
+    $userJoinedCount = (int)$joinedCountStmt->fetchColumn();
+
+    $debateJoinedStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE debate_id=?");
+    $debateJoinedStmt->execute([$debate['id']]);
+    $debateJoinedCount = (int)$debateJoinedStmt->fetchColumn();
+
+    $createdAt = strtotime($debate['created_at']);
+    $minutesSinceCreated = (time() - $createdAt) / 60;
+
+    $freeJoinAllowed = (
+      $userJoinedCount < $free_join_limit ||
+      $debateJoinedCount < $free_join_per_debate ||
+      $minutesSinceCreated <= $free_join_time_minutes
+    );
+
+    if ($isAdmin || $isCreator || $access_mode !== 'credits' || $credits_required <= 0 || $freeJoinAllowed) {
+      $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")->execute([$id, (int)$user['id']]);
       $success = 'Joined debate successfully (free access).';
       $joined = true;
     } else {
-      // Credits flow
       $wallet = $pdo->prepare("SELECT credits FROM wallets WHERE user_id=?");
       $wallet->execute([(int)$user['id']]);
       $userCredits = (int)$wallet->fetchColumn();
@@ -69,20 +79,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       if ($userCredits >= $credits_required) {
         $pdo->beginTransaction();
         try {
-          // Deduct credits atomically
           $pdo->prepare("UPDATE wallets SET credits=credits-? WHERE user_id=? AND credits >= ?")
               ->execute([$credits_required, (int)$user['id'], $credits_required]);
 
-          // Record participation
-          $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")
-              ->execute([$id, (int)$user['id']]);
+          $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")->execute([$id, (int)$user['id']]);
 
-          // Track spend
           $usd_value = $credits_required * $credit_rate;
           $pdo->prepare("INSERT INTO debate_spend (debate_id, user_id, credits, usd_value) VALUES (?, ?, ?, ?)")
               ->execute([$id, (int)$user['id'], $credits_required, $usd_value]);
 
-          // Creator earnings (50%)
           $creator_share = $usd_value * 0.50;
           $pdo->prepare("UPDATE wallets SET earnings_usd=earnings_usd+? WHERE user_id=?")
               ->execute([$creator_share, (int)$debate['creator_id']]);
@@ -101,8 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
   } elseif ($_POST['action'] === 'send_message') {
     $msg = trim($_POST['message'] ?? '');
     if ($msg && $joined) {
-      $pdo->prepare("INSERT INTO chat_messages (debate_id, user_id, message) VALUES (?, ?, ?)")
-          ->execute([$id, (int)$user['id'], $msg]);
+      $pdo->prepare("INSERT INTO chat_messages (debate_id, user_id, message) VALUES (?, ?, ?)")->execute([$id, (int)$user['id'], $msg]);
       $success = 'Message sent.';
     } else {
       $error = 'Join the debate to chat.';
@@ -118,7 +122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
 </head>
 <body>
 <?php include __DIR__ . '/../includes/header.php'; ?>
-
 <div class="container">
   <div class="card">
     <h2><?= htmlspecialchars($debate['title']) ?></h2>
@@ -138,13 +141,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       </div>
     <?php endif; ?>
 
-    <?php if (!empty($success)): ?>
-      <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
-    <?php endif; ?>
-
-    <?php if (!empty($error)): ?>
-      <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    <?php if (!empty($success)): ?><div class="alert alert-success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+    <?php if (!empty($error)): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <div style="margin-top:12px">
       <?php if (!$isLoggedIn): ?>
@@ -153,7 +151,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
         <form method="post" style="display:inline">
           <input type="hidden" name="action" value="join">
           <button class="btn" type="submit">
-            <?= ($isAdmin || $isCreator || $credits_required <= 0) ? 'Join (Free)' : "Join ({$credits_required} credits)" ?>
+            <?php
+            $freeJoinAllowed = (
+              $userJoinedCount < $free_join_limit ||
+              $debateJoinedCount < $free_join_per_debate ||
+              $minutesSinceCreated <= $free_join_time_minutes
+            );
+            echo ($isAdmin || $isCreator || $credits_required <= 0 || $freeJoinAllowed)
+              ? 'Join (Free)' : "Join ({$credits_required} credits)";
+            ?>
           </button>
         </form>
         <?php if (!$isAdmin && !$isCreator && $credits_required > 0): ?>
@@ -167,7 +173,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
     <?php if ($isLoggedIn && ($isAdmin || $isCreator)): ?>
       <div class="form-row" style="margin-top:16px">
         <a class="btn" href="/debates/edit.php?id=<?= (int)$debate['id'] ?>">Edit Debate</a>
-        <a class="btn-outline" href="/debates/delete.php?id=<?= (int)$debate['id'] ?>"
+        
+                <a class="btn" href="/debates/delete.php?id=<?= (int)$debate['id'] ?>"
            onclick="return confirm('Are you sure you want to delete this debate?');"
            style="margin-left:8px">Delete Debate</a>
       </div>
@@ -199,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
     <?php if ($joined && $isLoggedIn): ?>
       <div class="form-row" style="margin-bottom:8px">
         <button class="btn" id="startBtn">Enable camera & mic</button>
-        <button class="btn-outline" id="leaveBtn" style="margin-left:8px">Leave call</button>
+        <button class="btn" id="leaveBtn" style="margin-left:8px">Leave call</button>
       </div>
 
       <video id="localVideo" autoplay muted playsinline
@@ -220,43 +227,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
 <script>
-// Signaling server URL and room
 const signalingURL = 'https://zagdebate-signaling.onrender.com';
 const roomId = 'debate-' + <?= (int)$debate['id'] ?>;
 
-// State
 let socket = null;
-const peers = {};
 let localStream = null;
+const peers = {};
 
-// Elements
 const startBtn = document.getElementById('startBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const localVideo = document.getElementById('localVideo');
 const remoteVideos = document.getElementById('remoteVideos');
 const statusLabel = document.getElementById('status');
 
-// Helpers
 function updateStatus(msg) {
   if (statusLabel) statusLabel.textContent = msg;
   console.log('[WebRTC]', msg);
 }
 
-startBtn?.addEventListener('click', startCall);
-leaveBtn?.addEventListener('click', leaveCall);
-
-async function startCall() {
+startBtn?.addEventListener('click', async () => {
   try {
-    // HTTPS requirement for getUserMedia (except localhost)
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-      updateStatus('Calls require HTTPS. Please open this page over https.');
-      alert('Calls require HTTPS. Please use https.');
+      updateStatus('Calls require HTTPS. Please use https.');
+      alert('Calls require HTTPS. Please reload using https.');
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      updateStatus('Your browser does not support getUserMedia.');
-      alert('Your browser does not support camera/mic access. Try Chrome or Safari.');
+      updateStatus('Your browser does not support camera/mic.');
+      alert('Browser does not support camera/mic. Try Chrome or Safari.');
       return;
     }
 
@@ -276,12 +275,12 @@ async function startCall() {
       socket.emit('join-room', roomId);
     });
 
-    socket.on('connect_error', (err) => {
-      updateStatus('Signaling connection error: ' + err.message);
+    socket.on('connect_error', err => {
+      updateStatus('Signaling error: ' + err.message);
     });
 
-    socket.on('user-joined', (id) => {
-      updateStatus('Peer joined: ' + id + ' — creating connection...');
+    socket.on('user-joined', id => {
+      updateStatus('Peer joined: ' + id);
       if (!peers[id]) peers[id] = createPeer(id, true);
     });
 
@@ -290,27 +289,19 @@ async function startCall() {
       peers[sender].signal(signal);
     });
 
-    socket.on('user-left', (id) => {
+    socket.on('user-left', id => {
       updateStatus('Peer left: ' + id);
       destroyPeer(id);
     });
 
   } catch (err) {
     console.error('getUserMedia error:', err);
-    if (err.name === 'NotAllowedError') {
-      updateStatus('Permission denied. Allow camera/mic in browser settings and reload.');
-      alert('Camera/mic access denied. Please allow permissions and reload.');
-    } else if (err.name === 'NotFoundError') {
-      updateStatus('No camera or microphone found.');
-      alert('No camera or microphone detected.');
-    } else {
-      updateStatus('Error starting camera/mic: ' + err.message);
-      alert('Error starting camera/mic: ' + err.message);
-    }
+    updateStatus('Error: ' + err.message);
+    alert('Camera/mic error: ' + err.message);
   }
-}
+});
 
-function leaveCall() {
+leaveBtn?.addEventListener('click', () => {
   Object.keys(peers).forEach(id => destroyPeer(id));
   if (localStream) {
     localStream.getTracks().forEach(t => t.stop());
@@ -321,8 +312,8 @@ function leaveCall() {
     socket.disconnect();
     socket = null;
   }
-  updateStatus('Left the call. You can rejoin anytime.');
-}
+  updateStatus('Left the call.');
+});
 
 function createPeer(id, initiator) {
   const peer = new SimplePeer({
@@ -332,17 +323,17 @@ function createPeer(id, initiator) {
     config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
   });
 
-  peer.on('signal', (signal) => {
+  peer.on('signal', signal => {
     socket?.emit('signal', { roomId, signal, target: id });
   });
 
-  peer.on('stream', (remoteStream) => {
+  peer.on('stream', remoteStream => {
     addRemoteVideo(id, remoteStream);
     updateStatus('Connected to peer: ' + id);
   });
 
   peer.on('close', () => removeRemoteVideo(id));
-  peer.on('error', (err) => {
+  peer.on('error', err => {
     console.warn('Peer error', id, err);
     updateStatus('Peer error (' + id + '): ' + err.message);
   });

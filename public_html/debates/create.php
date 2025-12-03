@@ -4,10 +4,11 @@ require_once __DIR__ . '/../config/app.php';
 require_login();
 $user = current_user();
 
-// Load platform settings
-$settings = $pdo->query("SELECT debate_access_mode, credits_to_create FROM settings LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+// Load platform settings including free create limit
+$settings = $pdo->query("SELECT debate_access_mode, credits_to_create, free_create_limit FROM settings")->fetch(PDO::FETCH_ASSOC);
 $access_mode = $settings['debate_access_mode'] ?? 'free';
 $credits_required = (int)($settings['credits_to_create'] ?? 0);
+$free_create_limit = (int)($settings['free_create_limit'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $title = trim($_POST['title'] ?? '');
@@ -16,8 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $gallery = [];
 
   if ($title && $description) {
-    // If access mode is 'credits', check user balance (skip for admins)
-    if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0) {
+    // Count how many debates this user has already created
+    $createdCountStmt = $pdo->prepare("SELECT COUNT(*) FROM debates WHERE creator_id=?");
+    $createdCountStmt->execute([(int)$user['id']]);
+    $userCreatedCount = (int)$createdCountStmt->fetchColumn();
+
+    // If access mode is 'credits' and user exceeded free create limit, check balance (skip for admins)
+    if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0 && $userCreatedCount >= $free_create_limit) {
       $stmt = $pdo->prepare("SELECT credits FROM wallets WHERE user_id=?");
       $stmt->execute([$user['id']]);
       $userCredits = (int)$stmt->fetchColumn();
@@ -60,7 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $stmt->execute([(int)$user['id'], $title, $description, $thumb, json_encode($gallery)]);
       $debateId = (int)$pdo->lastInsertId();
 
-      if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0) {
+      // Deduct credits only if free limit exceeded
+      if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0 && $userCreatedCount >= $free_create_limit) {
         $deduct = $pdo->prepare("UPDATE wallets SET credits = credits - ? WHERE user_id = ? AND credits >= ?");
         $deduct->execute([$credits_required, $user['id'], $credits_required]);
 
@@ -116,10 +123,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input class="input" type="file" name="gallery[]" accept="image/*" multiple>
       </div>
     </div>
-    <?php if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0): ?>
+    <?php
+    // Show message about free chances left
+    $createdCountStmt = $pdo->prepare("SELECT COUNT(*) FROM debates WHERE creator_id=?");
+    $createdCountStmt->execute([(int)$user['id']]);
+    $userCreatedCount = (int)$createdCountStmt->fetchColumn();
+
+    if (!is_admin($user) && $access_mode === 'credits' && $credits_required > 0 && $userCreatedCount >= $free_create_limit): ?>
       <p class="label" style="margin-top:8px">Creating a debate costs <?= $credits_required ?> credits.</p>
     <?php else: ?>
-      <p class="label" style="margin-top:8px">Creating a debate is free.</p>
+      <p class="label" style="margin-top:8px">Creating a debate is free (<?= max(0, $free_create_limit - $userCreatedCount) ?> free chances left).</p>
     <?php endif; ?>
     <button class="btn" type="submit">Create</button>
   </form>

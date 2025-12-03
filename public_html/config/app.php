@@ -46,11 +46,20 @@ function ensure_wallet(PDO $pdo, int $user_id) {
   }
 }
 
+/**
+ * Fetch the latest settings row.
+ * Uses updated_at to ensure we always get the newest values.
+ */
 function get_settings(PDO $pdo) {
-  $s = $pdo->query("SELECT * FROM settings ORDER BY id DESC LIMIT 1")->fetch();
+  $stmt = $pdo->query("SELECT * FROM settings ORDER BY updated_at DESC LIMIT 1");
+  $s = $stmt->fetch(PDO::FETCH_ASSOC);
+
   if (!$s) {
+    // If no settings row exists, insert a default one
     $pdo->exec("INSERT INTO settings (admin_email) VALUES ('zagdebate@gmail.com')");
-    $s = $pdo->query("SELECT * FROM settings ORDER BY id DESC LIMIT 1")->fetch();
+    $stmt = $pdo->query("SELECT * FROM settings ORDER BY updated_at DESC LIMIT 1");
+    $s = $stmt->fetch(PDO::FETCH_ASSOC);
   }
+
   return $s;
 }
