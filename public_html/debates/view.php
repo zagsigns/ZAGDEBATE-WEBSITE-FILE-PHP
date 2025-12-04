@@ -127,19 +127,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
     <h2><?= htmlspecialchars($debate['title']) ?></h2>
     <p class="label">By <?= htmlspecialchars($debate['creator_name']) ?></p>
 
-    <?php if (!empty($debate['thumb_image'])): ?>
-      <img src="<?= htmlspecialchars($debate['thumb_image']) ?>" alt="Thumb" style="width:100%;max-height:320px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
-    <?php endif; ?>
+<?php
+if (!empty($debate['thumb_image'])) {
+  $thumbPath = __DIR__ . '/../' . ltrim($debate['thumb_image'], '/');
+  if (file_exists($thumbPath)) {
+    echo '<img src="' . htmlspecialchars($debate['thumb_image']) . '" alt="Thumb" style="width:100%;max-height:320px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">';
+  }
+}
+?>
+
 
     <p style="margin-top:10px"><?= nl2br(htmlspecialchars($debate['description'])) ?></p>
 
-    <?php if (!empty($gallery)): ?>
-      <div class="grid" style="margin-top:12px">
-        <?php foreach ($gallery as $g): ?>
-          <img src="<?= htmlspecialchars($g) ?>" alt="Gallery" style="width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
-        <?php endforeach; ?>
-      </div>
-    <?php endif; ?>
+<?php
+$validGallery = [];
+foreach ($gallery as $g) {
+  $galleryPath = __DIR__ . '/../' . ltrim($g, '/');
+  if (!empty($g) && file_exists($galleryPath)) {
+    $validGallery[] = $g;
+  }
+}
+if (!empty($validGallery)): ?>
+  <div class="grid" style="margin-top:12px">
+    <?php foreach ($validGallery as $g): ?>
+      <img src="<?= htmlspecialchars($g) ?>" alt="Gallery" style="width:100%;height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
 
     <?php if (!empty($success)): ?><div class="alert alert-success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
     <?php if (!empty($error)): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
