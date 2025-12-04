@@ -50,12 +50,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <label class="label">Password</label>
     <input class="input" type="password" name="password" required>
     <button class="btn" type="submit" style="margin-top:12px">Login</button>
-    <p class="label" style="margin-top:12px"><a href="/auth/forgot_password.php">Forgot password?</a></p>
+    <p class="label" style="margin-top:12px">
+      <a href="/auth/forgot_password.php">Forgot password?</a>
+    </p>
+    <p class="label" style="margin-top:6px">
+      <a href="/auth/register.php">Create a new account</a>
+    </p>
   </form>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-
-
 </body>
 </html>

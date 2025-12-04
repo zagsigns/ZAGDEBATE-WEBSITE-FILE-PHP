@@ -6,7 +6,7 @@
   --accent: #ff2e2e;    /* Red accent */
   --card: #111826;
   --border: #1f2937;
-  --header-height: 70px; /* consistent spacing for header */
+  --header-height: 80px; /* consistent spacing for header */
 }
 
 /* Reset & base */
@@ -54,7 +54,20 @@ body { padding-top: var(--header-height); }
   font-size: 18px;
   color: var(--text);
 }
-.brand img { width:32px; height:32px; }
+
+/* Bigger logo for desktop */
+.brand img {
+  width: auto;
+  height: 80px; /* increase size */
+}
+
+/* Optional: even larger on wide screens */
+@media (min-width: 1024px) {
+  .brand img {
+    height: 80px;
+  }
+}
+
 
 /* Menu desktop */
 .menu {

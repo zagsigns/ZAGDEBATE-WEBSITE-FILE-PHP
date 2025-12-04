@@ -3,12 +3,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZAG DEBATE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Site Icon -->
+  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
 <header class="header">
   <div class="navbar container">
     <!-- Brand / Logo -->
     <a class="brand" href="/">
-      <img src="/assets/img/logo.svg" alt="ZAG" class="logo-img">
-      <span class="logo-text">ZAG DEBATE</span>
+      <img src="/logo.png" alt="ZAG" class="logo-img">
+      <!--<span class="logo-text">ZAG DEBATE</span>-->
     </a>
 
     <!-- Toggle button (mobile) -->
