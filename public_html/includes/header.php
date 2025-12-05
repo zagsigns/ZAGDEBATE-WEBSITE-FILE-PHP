@@ -23,11 +23,14 @@ if (session_status() === PHP_SESSION_NONE) {
     <!-- Brand / Logo -->
     <a class="brand" href="/">
       <img src="/logo.png" alt="ZAG" class="logo-img">
-      <!--<span class="logo-text">ZAG DEBATE</span>-->
     </a>
 
     <!-- Toggle button (mobile) -->
-    <button class="toggle btn-outline" onclick="document.querySelector('.mobile-menu').classList.toggle('open')">
+    <button
+      class="toggle btn-outline"
+      aria-label="Open menu"
+      onclick="document.getElementById('mobileMenu').classList.toggle('open')"
+    >
       ☰
     </button>
 
@@ -40,7 +43,7 @@ if (session_status() === PHP_SESSION_NONE) {
         <?php if ($_SESSION['user']['role'] === 'admin'): ?>
           <a href="/admin/dashboard.php" class="btn">Admin Dashboard</a>
         <?php endif; ?>
-        <a href="/auth/logout.php" class="btn">Logout</a>
+        <a href="/auth/logout.php" class="btn" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
       <?php else: ?>
         <a href="/auth/register.php" class="btn">Register</a>
         <a href="/auth/login.php" class="btn">Login</a>
@@ -48,8 +51,14 @@ if (session_status() === PHP_SESSION_NONE) {
     </nav>
   </div>
 
-  <!-- Mobile menu -->
-  <div class="mobile-menu">
+  <!-- Mobile menu flyout -->
+  <div class="mobile-menu" id="mobileMenu">
+    <button
+      class="mobile-close"
+      aria-label="Close menu"
+      onclick="document.getElementById('mobileMenu').classList.remove('open')"
+    >✕</button>
+
     <a href="/debates/list.php">Debates</a>
     <a href="/user/dashboard.php">Dashboard</a>
 
@@ -57,7 +66,7 @@ if (session_status() === PHP_SESSION_NONE) {
       <?php if ($_SESSION['user']['role'] === 'admin'): ?>
         <a href="/admin/dashboard.php">Admin Dashboard</a>
       <?php endif; ?>
-      <a href="/auth/logout.php">Logout</a>
+      <a href="/auth/logout.php" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
     <?php else: ?>
       <a href="/auth/register.php">Register</a>
       <a href="/auth/login.php">Login</a>
