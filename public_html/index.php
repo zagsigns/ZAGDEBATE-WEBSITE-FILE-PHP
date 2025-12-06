@@ -104,9 +104,9 @@ function qs(array $overrides = []) {
     <!-- Search form with clear button -->
     <form class="search-bar" method="get" action="/" role="search" aria-label="Search debates">
       <label for="q" class="sr-only">Search debates</label>
-      <input id="q" name="q" class="search-input" type="search" placeholder="Search debates by title or description..." value="<?= htmlspecialchars($q) ?>" aria-label="Search debates" autocomplete="off" />
+      <input id="q" name="q" class="search-input" type="search" placeholder="🔍 Search debates by title or description..." value="<?= htmlspecialchars($q) ?>" aria-label="Search debates" autocomplete="off" />
       <button type="button" class="search-clear" id="searchClear" title="Clear search" aria-hidden="false">✕</button>
-      <button class="search-btn" type="submit">Search</button>
+      <button class="search-btn" type="submit">🔍 Search</button>
     </form>
 
     <?php if ($q !== ''): ?>

@@ -268,3 +268,71 @@ body .mobile-menu.open{
   backdrop-filter:none !important;
   mix-blend-mode:normal !important;
 }
+
+
+
+
+
+
+/* Mobile + tablet: slightly reduce vertical gap between input and button */
+@media (max-width:1023px) {
+  .search-bar {
+    gap: 0px !important; /* subtle reduction from 8px */
+  }
+}
+
+/* Very small screens (already stacked): keep column but tighten spacing */
+@media (max-width:520px) {
+  .search-bar {
+    gap: 0px !important; /* was 8px in your small screens block */
+  }
+  .search-input,
+  .search-btn {
+    margin: 0 !important; /* ensure no extra vertical margins slip in */
+  }
+}
+
+
+
+/* Home page: small vertical spacing around search bar
+   Applies only to mobile (≤768px) and desktop (≥1024px). Tablet (769–1023px) unchanged. */
+@media (max-width:768px) {
+  .container > .search-bar {
+    margin-top: 15px !important;    /* small space above */
+    margin-bottom: 5px !important; /* small space below */
+    padding-top: 6px !important;    /* keep inner padding compact */
+    padding-bottom: 6px !important;
+  }
+}
+
+@media (min-width:1024px) {
+  .container > .search-bar {
+    margin-top: 15px !important;    /* slightly larger on desktop */
+    margin-bottom: 8px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+}
+
+
+
+
+/* Mobile + tablet only: add vertical space between stacked input and button */
+@media (max-width:1023px) {
+  .list-search-center .search-bar {
+    flex-direction: column !important; /* ensure stacked layout */
+    gap: 18px !important;               /* vertical space between input and button */
+    padding: 10px !important;          /* keep touch targets comfortable */
+    box-sizing: border-box !important;
+  }
+
+  .list-search-center .search-input,
+  .list-search-center .search-btn {
+    width: 100% !important;            /* full width when stacked */
+    margin: 0 !important;              /* remove stray margins */
+    padding: 10px 12px !important;     /* consistent vertical padding */
+    line-height: 1 !important;
+    height: auto !important;
+  }
+}
+

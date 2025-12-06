@@ -90,8 +90,8 @@ function qs(array $overrides = []) {
   <div class="list-search-center" role="region" aria-label="Search debates">
     <form class="search-bar" method="get" action="/debates/list.php" role="search" aria-label="Search debates">
       <label for="q" class="sr-only">Search debates</label>
-      <input id="q" name="q" class="search-input" type="search" placeholder="Search debates by title or description..." value="<?= htmlspecialchars($q) ?>" aria-label="Search debates" autocomplete="off">
-      <button class="search-btn" type="submit">Search</button>
+      <input id="q" name="q" class="search-input" type="search" placeholder="🔍 Search debates by title or description..." value="<?= htmlspecialchars($q) ?>" aria-label="Search debates" autocomplete="off">
+      <button class="search-btn" type="submit">🔍 Search</button>
     </form>
   </div>
 
