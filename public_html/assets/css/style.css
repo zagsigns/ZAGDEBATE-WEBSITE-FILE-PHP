@@ -8,7 +8,7 @@
   --border:#1f2937;
   --header-height:56px;           /* mobile / default */
   --desktop-header-height:80px;   /* desktop override */
-  --mobile-menu-width:280px;
+  --mobile-menu-width:280px;      /* base partial width */
   --container-max:1100px;
   --radius:8px;
   --shadow-1:0 4px 12px rgba(0,0,0,0.45);
@@ -38,20 +38,21 @@ body{padding-top:var(--header-height);transition:padding-top .18s ease}
 @media (max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:640px){.grid{grid-template-columns:1fr;gap:10px}}
 
-/* Header */
+/* Header (solid background — no transparency) */
 .header{
   position:fixed;top:0;left:0;right:0;height:var(--header-height);
-  background:linear-gradient(180deg,rgba(14,20,32,0.96),rgba(14,20,32,0.92));
-  border-bottom:1px solid var(--border);z-index:1200;display:flex;align-items:center;
-  backdrop-filter:blur(6px)
+  background:var(--bg-2); /* solid, opaque */
+  border-bottom:1px solid var(--border);
+  z-index:1200;display:flex;align-items:center;
+  backdrop-filter:none; filter:none; opacity:1;
 }
 .navbar{
   width:100%;max-width:var(--container-max);margin:0 auto;padding:0 12px;
   display:flex;align-items:center;justify-content:space-between;height:100%
 }
-.brand{display:flex;align-items:center;gap:10px;margin-left:6px}
+.brand{display:flex;align-items:center;gap:10px;margin-left:8px}
 .brand img{height:40px;width:auto;display:block}
-.brand .logo-text{font-weight:700;font-size:1rem;letter-spacing:.4px;color:var(--text)}
+.logo-img{display:block} /* explicit class from header.php */
 
 /* Desktop header increase (only on wide screens) */
 @media (min-width:1024px){
@@ -60,7 +61,22 @@ body{padding-top:var(--header-height);transition:padding-top .18s ease}
   .header{height:var(--header-height)}
   .navbar{padding:0 20px}
   .brand img{height:56px}
-  .brand .logo-text{font-size:1.15rem}
+}
+
+/* Mobile/tablet: make logo and toggle larger + margins */
+@media (max-width:1024px){
+  .brand{margin-left:14px}
+  .brand img{height:48px}
+  .toggle{
+    padding:12px; font-size:1.8rem; margin-right:14px; border-radius:10px;
+  }
+}
+@media (max-width:768px){
+  .brand{margin-left:16px}
+  .brand img{height:52px}
+  .toggle{
+    padding:14px; font-size:2rem; margin-right:16px;
+  }
 }
 
 /* Desktop menu */
@@ -76,32 +92,50 @@ body{padding-top:var(--header-height);transition:padding-top .18s ease}
 .btn:hover{transform:translateY(-1px);opacity:.98}
 .btn-outline{background:transparent;border:1px solid var(--accent);color:var(--accent);padding:7px 10px}
 
-/* Toggle (mobile) */
-.toggle{display:none;background:transparent;border:1px solid transparent;color:var(--text);padding:6px;border-radius:8px;cursor:pointer}
+/* Toggle (mobile) — solid background */
+.toggle{
+  display:none;
+  background:var(--bg-2);
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:10px;border-radius:8px;cursor:pointer;font-size:1.6rem;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+}
+.toggle:hover{background:rgba(255,46,46,0.08);border-color:var(--accent)}
 .toggle:focus{outline:2px solid rgba(255,46,46,0.12)}
 
-/* Mobile flyout menu */
+/* Mobile flyout menu — partial width, opaque */
 .mobile-menu{
   position:fixed;top:var(--header-height);right:calc(-1 * var(--mobile-menu-width));
   width:var(--mobile-menu-width);height:calc(100% - var(--header-height));
-  background:linear-gradient(180deg,#0f1724,#0b1220);border-left:1px solid rgba(255,255,255,0.03);
-  display:flex;flex-direction:column;padding:10px;gap:6px;transition:right .26s cubic-bezier(.2,.9,.2,1);
-  z-index:1300;box-shadow:-6px 0 20px rgba(0,0,0,0.55)
+  max-width:80vw; /* partial coverage */
+  background:var(--bg-2); /* solid */
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;padding:12px;gap:8px;
+  transition:right .26s cubic-bezier(.2,.9,.2,1);
+  z-index:1400;box-shadow:-8px 0 26px rgba(0,0,0,0.6);
+  opacity:1; backdrop-filter:none; filter:none; mix-blend-mode:normal;
 }
 .mobile-menu.open{right:0}
-.mobile-menu a{color:#fff;padding:10px 12px;border-radius:8px;font-weight:700;text-decoration:none}
+.mobile-menu a{color:#fff;padding:10px 12px;border-radius:8px;font-weight:700;text-decoration:none;background:transparent}
 .mobile-menu a:hover{background:rgba(255,46,46,0.06)}
 
-/* Mobile close button */
-.mobile-close{align-self:flex-end;background:transparent;border:1px solid rgba(255,255,255,0.04);color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer}
-.mobile-close:hover{background:rgba(255,46,46,0.06);border-color:var(--accent)}
-
-/* Mobile overlay */
-.mobile-overlay{position:fixed;inset:0;top:var(--header-height);background:rgba(0,0,0,0.45);opacity:0;visibility:hidden;transition:opacity .26s,visibility .26s;z-index:1250}
+/* Mobile overlay — darker behind menu */
+.mobile-overlay{
+  position:fixed;inset:0;top:var(--header-height);background:rgba(0,0,0,0.6);
+  opacity:0;visibility:hidden;transition:opacity .26s,visibility .26s;z-index:1350
+}
 .mobile-overlay.open{opacity:1;visibility:visible}
 
+/* Mobile close button */
+.mobile-close{
+  align-self:flex-end;background:transparent;border:1px solid rgba(255,255,255,0.1);
+  color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer
+}
+.mobile-close:hover{background:rgba(255,46,46,0.06);border-color:var(--accent)}
+
 /* Responsive */
-@media (max-width:768px){.menu{display:none}.toggle{display:inline-flex}}
+@media (max-width:768px){.menu{display:none}.toggle{display:inline-flex;align-items:center;justify-content:center}}
 
 /* Card base */
 .card{
@@ -167,7 +201,7 @@ body{padding-top:var(--header-height);transition:padding-top .18s ease}
 .label{color:var(--muted);font-size:.88rem;display:block}
 .alert{padding:10px;border-radius:8px;margin-top:8px}
 
-/* Footer - restored structured, stylish layout */
+/* Footer */
 .site-footer{
   background:linear-gradient(180deg,#0f1114,#0b0b0b);
   color:#e9ecef;
@@ -203,30 +237,34 @@ body{padding-top:var(--header-height);transition:padding-top .18s ease}
   .site-footer .social-row a{width:34px;height:34px}
 }
 
-/* Footer small adjustments to avoid distortion */
-.site-footer .col p, .site-footer .col a { margin: 0; line-height: 1.5; }
-.site-footer .col + .col { padding-left: 8px; }
-
-/* Footer: ensure body bottom padding not affected */
-@media (min-width:1024px){
-  /* nothing extra here; header handled above */
-}
-
-/* Footer small */
-.footer-bottom{margin-top:12px}
+/* Footer small adjustments */
+.site-footer .col p, .site-footer .col a { margin:0; line-height:1.5; }
+.site-footer .col + .col { padding-left:8px; }
 
 /* Accessibility helpers */
 .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap;border:0;padding:0;margin:-1px}
 
 /* Small screens adjustments (compact) */
 @media (max-width:520px){
-  :root{--mobile-menu-width:100%}
+  :root{--mobile-menu-width:80vw}   /* ensure partial width on smallest screens */
   .container{padding:10px}
   .hero{min-height:34vh;padding:12px 10px}
-  .brand img{height:36px}
+  .brand img{height:50px}
   .search-bar{padding:10px;flex-direction:column;gap:8px}
   .grid{gap:10px}
   .debate-thumb{height:110px}
   .site-footer{padding:20px 12px}
   .site-footer .footer-container{padding:0}
+}
+
+/* Final overrides to guarantee opacity (if anything else tries to add transparency) */
+body .header,
+body .mobile-menu,
+body .mobile-menu.open{
+  background-color:var(--bg-2) !important;
+  background-image:none !important;
+  opacity:1 !important;
+  filter:none !important;
+  backdrop-filter:none !important;
+  mix-blend-mode:normal !important;
 }
