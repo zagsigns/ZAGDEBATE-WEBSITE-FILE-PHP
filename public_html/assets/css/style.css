@@ -336,3 +336,13 @@ body .mobile-menu.open{
   }
 }
 
+
+
+/* Footer: add left margin in mobile and desktop only */
+@media (max-width:768px), (min-width:1024px) {
+  .site-footer .footer-container {
+    padding-left: 16px !important;  /* adds left margin */
+  }
+}
+
+

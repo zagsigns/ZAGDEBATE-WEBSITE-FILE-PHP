@@ -317,6 +317,9 @@ startBtn?.addEventListener('click', async () => {
 });
 
 leaveBtn?.addEventListener('click', () => {
+  const confirmLeave = confirm('Are you sure you want to leave the call?');
+  if (!confirmLeave) return;
+
   Object.keys(peers).forEach(id => destroyPeer(id));
   if (localStream) {
     localStream.getTracks().forEach(t => t.stop());
