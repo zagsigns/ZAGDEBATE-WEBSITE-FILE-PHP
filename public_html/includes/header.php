@@ -96,8 +96,21 @@ if (session_status() === PHP_SESSION_NONE) {
   }
 }
 
-    
+
+
   </style>
+  
+  
+  
+<!--AdSense code snippet-->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2771457394201259"
+     crossorigin="anonymous"></script>
+
+<!--Adsense Meta tag     -->
+<meta name="google-adsense-account" content="ca-pub-2771457394201259">     
+     
+     
+  
 </head>
 <body>
 <header class="header">
