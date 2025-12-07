@@ -20,23 +20,10 @@ if (!$debate) {
   exit;
 }
 
-$gallery = [];
-if (!empty($debate['gallery_json'])) {
-  $gallery = json_decode($debate['gallery_json'], true) ?: [];
-}
-
-$user = current_user();
-$isLoggedIn = $user && !empty($user['id']);
-$isAdmin = $isLoggedIn && is_admin($user);
-$isCreator = $isLoggedIn && ($debate['creator_id'] == $user['id']);
-
-$joined = false;
-if ($isLoggedIn) {
-  $j = $pdo->prepare("SELECT id FROM debate_participants WHERE debate_id=? AND user_id=?");
-  $j->execute([$id, (int)$user['id']]);
-  $joined = (bool)$j->fetch();
-}
-
+/*
+ * Settings must be loaded early because several derived variables
+ * (free join limits, credits, etc.) depend on them.
+ */
 $settings = get_settings($pdo) ?: [];
 $access_mode = $settings['debate_access_mode'] ?? 'free';
 $credits_required = (int)($settings['credits_to_join'] ?? 0);
@@ -45,22 +32,62 @@ $free_join_limit = (int)($settings['free_join_limit'] ?? 0);
 $free_join_per_debate = (int)($settings['free_join_per_debate'] ?? 0);
 $free_join_time_minutes = (int)($settings['free_join_time_minutes'] ?? 0);
 
+/* Gallery JSON decode */
+$gallery = [];
+if (!empty($debate['gallery_json'])) {
+  $gallery = json_decode($debate['gallery_json'], true) ?: [];
+}
+
+/* Current user and roles */
+$user = current_user();
+$isLoggedIn = $user && !empty($user['id']);
+$isAdmin = $isLoggedIn && is_admin($user);
+$isCreator = $isLoggedIn && ($debate['creator_id'] == $user['id']);
+
+/* Has the current user already joined this debate? */
+$joined = false;
+if ($isLoggedIn) {
+  $j = $pdo->prepare("SELECT id FROM debate_participants WHERE debate_id=? AND user_id=?");
+  $j->execute([$id, (int)$user['id']]);
+  $joined = (bool)$j->fetch();
+}
+
+/* Derived timing and counts used for free-join logic */
+$createdAt = strtotime($debate['created_at']);
+$minutesSinceCreated = ($createdAt > 0) ? (time() - $createdAt) / 60 : PHP_INT_MAX;
+
+$userJoinedCount = 0;
+$debateJoinedCount = 0;
+
+if ($isLoggedIn) {
+  $joinedCountStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE user_id=?");
+  $joinedCountStmt->execute([(int)$user['id']]);
+  $userJoinedCount = (int)$joinedCountStmt->fetchColumn();
+
+  $debateJoinedStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE debate_id=?");
+  $debateJoinedStmt->execute([$debate['id']]);
+  $debateJoinedCount = (int)$debateJoinedStmt->fetchColumn();
+}
+
+/* Evaluate free join allowance once (safe defaults already set above) */
+$freeJoinAllowed = (
+  $userJoinedCount < $free_join_limit ||
+  $debateJoinedCount < $free_join_per_debate ||
+  $minutesSinceCreated <= $free_join_time_minutes
+);
+
+/* Success / error messages */
 $success = '';
 $error = '';
 
+/*
+ * POST handling
+ * Note: we reuse the counts and $freeJoinAllowed computed above.
+ * After a successful join we update $joined and optionally counts/messages.
+ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLoggedIn) {
   if ($_POST['action'] === 'join' && !$joined) {
-    $joinedCountStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE user_id=?");
-    $joinedCountStmt->execute([(int)$user['id']]);
-    $userJoinedCount = (int)$joinedCountStmt->fetchColumn();
-
-    $debateJoinedStmt = $pdo->prepare("SELECT COUNT(*) FROM debate_participants WHERE debate_id=?");
-    $debateJoinedStmt->execute([$debate['id']]);
-    $debateJoinedCount = (int)$debateJoinedStmt->fetchColumn();
-
-    $createdAt = strtotime($debate['created_at']);
-    $minutesSinceCreated = (time() - $createdAt) / 60;
-
+    // Re-evaluate freeJoinAllowed in case settings changed between requests
     $freeJoinAllowed = (
       $userJoinedCount < $free_join_limit ||
       $debateJoinedCount < $free_join_per_debate ||
@@ -68,10 +95,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
     );
 
     if ($isAdmin || $isCreator || $access_mode !== 'credits' || $credits_required <= 0 || $freeJoinAllowed) {
-      $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")->execute([$id, (int)$user['id']]);
+      // Free join path
+      $ins = $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)");
+      $ins->execute([$id, (int)$user['id']]);
       $success = 'Joined debate successfully (free access).';
       $joined = true;
+
+      // Update local counts for immediate UI feedback
+      $debateJoinedCount++;
+      $userJoinedCount++;
     } else {
+      // Credits path
       $wallet = $pdo->prepare("SELECT credits FROM wallets WHERE user_id=?");
       $wallet->execute([(int)$user['id']]);
       $userCredits = (int)$wallet->fetchColumn();
@@ -79,11 +113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       if ($userCredits >= $credits_required) {
         $pdo->beginTransaction();
         try {
+          // Deduct credits safely
           $pdo->prepare("UPDATE wallets SET credits=credits-? WHERE user_id=? AND credits >= ?")
               ->execute([$credits_required, (int)$user['id'], $credits_required]);
 
+          // Add participant
           $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")->execute([$id, (int)$user['id']]);
 
+          // Record spend and transfer creator share
           $usd_value = $credits_required * $credit_rate;
           $pdo->prepare("INSERT INTO debate_spend (debate_id, user_id, credits, usd_value) VALUES (?, ?, ?, ?)")
               ->execute([$id, (int)$user['id'], $credits_required, $usd_value]);
@@ -95,9 +132,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
           $pdo->commit();
           $success = "Joined debate successfully. Spent $credits_required credits.";
           $joined = true;
+
+          // Update local counts for immediate UI feedback
+          $debateJoinedCount++;
+          $userJoinedCount++;
         } catch (Exception $e) {
           $pdo->rollBack();
-          $error = 'Could not join debate.';
+          $error = 'Could not join debate. Please try again later.';
         }
       } else {
         $error = "Not enough credits. You need $credits_required credits.";
@@ -136,10 +177,10 @@ if (!empty($debate['thumb_image'])) {
 }
 ?>
 
-
     <p style="margin-top:10px"><?= nl2br(htmlspecialchars($debate['description'])) ?></p>
 
 <?php
+// Ensure $validGallery is always defined
 $validGallery = [];
 foreach ($gallery as $g) {
   $galleryPath = __DIR__ . '/../' . ltrim($g, '/');
@@ -155,7 +196,6 @@ if (!empty($validGallery)): ?>
   </div>
 <?php endif; ?>
 
-
     <?php if (!empty($success)): ?><div class="alert alert-success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
     <?php if (!empty($error)): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
@@ -166,15 +206,9 @@ if (!empty($validGallery)): ?>
         <form method="post" style="display:inline">
           <input type="hidden" name="action" value="join">
           <button class="btn" type="submit">
-            <?php
-            $freeJoinAllowed = (
-              $userJoinedCount < $free_join_limit ||
-              $debateJoinedCount < $free_join_per_debate ||
-              $minutesSinceCreated <= $free_join_time_minutes
-            );
-            echo ($isAdmin || $isCreator || $credits_required <= 0 || $freeJoinAllowed)
-              ? 'Join (Free)' : "Join ({$credits_required} credits)";
-            ?>
+            <?= ($isAdmin || $isCreator || $credits_required <= 0 || $freeJoinAllowed)
+                ? 'Join (Free)'
+                : "Join ({$credits_required} credits)"; ?>
           </button>
         </form>
         <?php if (!$isAdmin && !$isCreator && $credits_required > 0): ?>
@@ -188,8 +222,7 @@ if (!empty($validGallery)): ?>
     <?php if ($isLoggedIn && ($isAdmin || $isCreator)): ?>
       <div class="form-row" style="margin-top:16px">
         <a class="btn" href="/debates/edit.php?id=<?= (int)$debate['id'] ?>">Edit Debate</a>
-        
-                <a class="btn" href="/debates/delete.php?id=<?= (int)$debate['id'] ?>"
+        <a class="btn" href="/debates/delete.php?id=<?= (int)$debate['id'] ?>"
            onclick="return confirm('Are you sure you want to delete this debate?');"
            style="margin-left:8px">Delete Debate</a>
       </div>
