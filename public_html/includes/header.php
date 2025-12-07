@@ -144,17 +144,17 @@ if (session_status() === PHP_SESSION_NONE) {
 
     <!-- Desktop menu (kept for desktop; hidden on small screens by existing CSS) -->
     <nav class="menu" aria-label="Primary navigation">
-      <a href="/debates/list.php" class="btn">Debates</a>
-      <a href="/user/dashboard.php" class="btn">Dashboard</a>
+      <a href="/debates/list.php" class="btn">🗣 Debates</a>
+      <a href="/user/dashboard.php" class="btn">👤📊 User Dashboard</a>
 
       <?php if (!empty($_SESSION['user'])): ?>
         <?php if ($_SESSION['user']['role'] === 'admin'): ?>
-          <a href="/admin/dashboard.php" class="btn">Admin Dashboard</a>
+          <a href="/admin/dashboard.php" class="btn">👤📊 Admin Dashboard</a>
         <?php endif; ?>
         <a href="/auth/logout.php" class="btn" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
       <?php else: ?>
-        <a href="/auth/register.php" class="btn">Register</a>
-        <a href="/auth/login.php" class="btn">Login</a>
+        <a href="/auth/register.php" class="btn"> 👤➕ User Register</a>
+        <a href="/auth/login.php" class="btn">👤🔑 Login</a>
       <?php endif; ?>
     </nav>
   </div>
@@ -167,17 +167,17 @@ if (session_status() === PHP_SESSION_NONE) {
       onclick="document.getElementById('mobileMenu').classList.remove('open')"
     >✕</button>
 
-    <a href="/debates/list.php">Debates</a>
-    <a href="/user/dashboard.php">Dashboard</a>
+    <a href="/debates/list.php">🗣 Debates</a>
+    <a href="/user/dashboard.php">👤📊 User Dashboard</a>
 
     <?php if (!empty($_SESSION['user'])): ?>
       <?php if ($_SESSION['user']['role'] === 'admin'): ?>
-        <a href="/admin/dashboard.php">Admin Dashboard</a>
+        <a href="/admin/dashboard.php">👤📊 Admin Dashboard</a>
       <?php endif; ?>
       <a href="/auth/logout.php" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
     <?php else: ?>
-      <a href="/auth/register.php">Register</a>
-      <a href="/auth/login.php">Login</a>
+      <a href="/auth/register.php">👤➕ User Register</a>
+      <a href="/auth/login.php">👤🔑 Login</a>
     <?php endif; ?>
   </div>
 </header>

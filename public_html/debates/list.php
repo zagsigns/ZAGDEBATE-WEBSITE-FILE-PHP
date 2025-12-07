@@ -1,22 +1,22 @@
 <?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/app.php';
-$meta_title = 'All Debates • ZAG DEBATE';
 
+$meta_title = 'All Debates • ZAG DEBATE';
 $user = current_user();
 
-// Always fetch the latest settings row
+/* Load latest settings */
 $settings = $pdo->query("SELECT debate_access_mode, credits_to_join FROM settings ORDER BY id DESC LIMIT 1")->fetch();
 $access_mode = $settings['debate_access_mode'] ?? 'free';
 $credits_required = (int)($settings['credits_to_join'] ?? 0);
 
-// Read search and pagination (GET)
+/* Read search and pagination (GET) */
 $q = trim((string)($_GET['q'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 18;
 $offset = ($page - 1) * $perPage;
 
-// Build safe query
+/* Build safe query */
 $params = [];
 $where = '';
 if ($q !== '') {
@@ -24,14 +24,14 @@ if ($q !== '') {
     $params[':q'] = '%' . $q . '%';
 }
 
-// Count total for pagination
+/* Count total for pagination */
 $countSql = "SELECT COUNT(*) FROM debates d $where";
 $countStmt = $pdo->prepare($countSql);
 $countStmt->execute($params);
 $total = (int)$countStmt->fetchColumn();
 $totalPages = max(1, (int)ceil($total / $perPage));
 
-// Fetch debates with creator name
+/* Fetch debates with creator name (safe prepared statement) */
 $sql = "SELECT d.*, u.name AS creator_name
         FROM debates d
         JOIN users u ON d.creator_id = u.id
@@ -45,13 +45,20 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $debates = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Helper for building query strings (preserve q)
+/* Helper for building query strings (preserve q) */
 function qs(array $overrides = []) {
     $base = $_GET;
     foreach ($overrides as $k => $v) {
         if ($v === null) unset($base[$k]); else $base[$k] = $v;
     }
     return http_build_query($base);
+}
+
+/* Helper: safe check for server-side image file existence */
+function debate_thumb_exists($thumb_path) {
+    if (empty($thumb_path)) return false;
+    $local = __DIR__ . '/../' . ltrim($thumb_path, '/');
+    return file_exists($local);
 }
 ?>
 <!DOCTYPE html>
@@ -63,7 +70,7 @@ function qs(array $overrides = []) {
   <?php include __DIR__ . '/../seo/meta.php'; ?>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    /* Inline helpers to ensure centered search looks neat even if external CSS hasn't loaded */
+    /* Small inline helpers to keep layout tidy if external CSS is missing */
     .list-search-center {
       display:flex;
       justify-content:center;
@@ -77,7 +84,9 @@ function qs(array $overrides = []) {
     .search-input::placeholder { color:#9aa3ad; }
     .search-btn { padding:10px 14px; border-radius:8px; background:var(--accent); color:#fff; border:none; cursor:pointer; font-weight:600; }
     .sr-only { position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
-    @media (max-width:520px) { .search-bar { flex-direction:column; } .search-btn { width:100%; } }
+    .debate-thumb { width:100%; height:160px; object-fit:cover; border-radius:8px; border:1px solid var(--border); display:block; margin-bottom:10px; }
+    .debate-card { display:flex; flex-direction:column; gap:6px; }
+    @media (max-width:520px) { .search-bar { flex-direction:column; } .search-btn { width:100%; } .debate-thumb { height:120px; } }
   </style>
 </head>
 <body>
@@ -86,7 +95,7 @@ function qs(array $overrides = []) {
 <div class="container">
   <h1 style="text-align:center; margin-top:8px;">All debates</h1>
 
-  <!-- Centered Search (middle of the page) -->
+  <!-- Centered Search -->
   <div class="list-search-center" role="region" aria-label="Search debates">
     <form class="search-bar" method="get" action="/debates/list.php" role="search" aria-label="Search debates">
       <label for="q" class="sr-only">Search debates</label>
@@ -114,11 +123,11 @@ function qs(array $overrides = []) {
       </div>
     <?php else: ?>
       <?php foreach ($debates as $deb): ?>
-        <?php
-          $img = $deb['thumb_image'] ? htmlspecialchars($deb['thumb_image']) : '/assets/img/placeholder.jpg';
-        ?>
         <article class="card debate-card" itemscope itemtype="http://schema.org/DiscussionForumPosting">
-          <img src="<?= $img ?>" alt="Thumbnail for <?= htmlspecialchars($deb['title']) ?>" class="debate-thumb" loading="lazy">
+          <?php if (!empty($deb['thumb_image']) && debate_thumb_exists($deb['thumb_image'])): ?>
+            <img src="<?= htmlspecialchars($deb['thumb_image']) ?>" alt="Thumbnail for <?= htmlspecialchars($deb['title']) ?>" class="debate-thumb" loading="lazy">
+          <?php endif; ?>
+
           <h3 class="debate-title" itemprop="headline"><?= htmlspecialchars($deb['title']) ?></h3>
           <div class="label" style="margin-bottom:8px;">By <?= htmlspecialchars($deb['creator_name']) ?></div>
 

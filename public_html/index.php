@@ -83,7 +83,23 @@ function qs(array $overrides = []) {
     .search-clear { background:transparent; border:1px solid transparent; color:var(--muted); padding:6px 8px; border-radius:8px; cursor:pointer; transition:color .12s, background .12s; }
     .search-clear:hover { color:#fff; background:rgba(255,255,255,0.03); }
     .sr-only { position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
-    @media (max-width:520px) { .search-bar { flex-direction:column; gap:8px; padding:12px; } .search-btn { width:100%; } .search-clear { align-self:flex-end; } }
+
+    /* CTA buttons row */
+    .cta-buttons { display:flex; gap:12px; justify-content:center; align-items:center; margin-top:18px; flex-wrap:wrap; }
+    .cta-buttons .btn { display:inline-block; }
+
+    /* Keep existing button colors/styles intact; only change layout on smaller screens */
+    @media (max-width:900px) {
+      .cta-buttons { flex-direction:column; align-items:stretch; gap:10px; }
+      .cta-buttons .btn { width:100%; text-align:center; }
+      .search-bar { flex-direction:column; gap:8px; padding:12px; }
+      .search-btn { width:100%; }
+      .search-clear { align-self:flex-end; }
+    }
+
+    @media (max-width:520px) {
+      .search-bar { padding:12px; }
+    }
   </style>
 </head>
 <body>
@@ -96,9 +112,11 @@ function qs(array $overrides = []) {
     <h2 class="tagline">Debate boldly. Earn fairly.</h2>
     <p class="subtext">Start a topic, invite the crowd, and split the revenue 50/50 with the platform.</p>
 
-    <div class="cta-buttons" style="margin-top:18px;">
-      <a class="btn btn-primary" href="/auth/register.php">Create your account</a>
-      <a class="btn btn-secondary" href="/debates/list.php" style="margin-left:8px">Explore debates</a>
+    <div class="cta-buttons" role="region" aria-label="Primary actions">
+      <a class="btn btn-primary" href="/auth/register.php">👤➕ Create your account</a>
+      <a class="btn btn-secondary" href="/debates/list.php">🔍💬  Explore debates</a>
+      <!-- New button that redirects to user dashboard -->
+      <a class="btn btn-primary" href="/user/dashboard.php">🗣💰️ Create debate&amp;Earn</a>
     </div>
 
     <!-- Search form with clear button -->
@@ -148,7 +166,7 @@ function qs(array $overrides = []) {
             <h3 class="debate-title" itemprop="headline"><?= htmlspecialchars($deb['title']) ?></h3>
             <p class="debate-desc" itemprop="articleBody"><?= htmlspecialchars(mb_strimwidth(strip_tags($deb['description']), 0, 140, '...')) ?></p>
             <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-              <a class="btn-view" href="/debates/view.php?id=<?= (int)$deb['id'] ?>">View Debate</a>
+              <a class="btn-view" href="/debates/view.php?id=<?= (int)$deb['id'] ?>">👁🗣️️ View Debate</a>
               <div style="margin-left:auto; color:var(--muted); font-size:0.9rem;">By <?= htmlspecialchars($deb['creator_name']) ?></div>
             </div>
           </article>
