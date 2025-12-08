@@ -8,19 +8,22 @@
 
     <!-- Footer navigation links -->
     <div class="footer-links">
-      <a href="/debates/list.php">Explore Debates</a>
-      <a href="/user/dashboard.php">Dashboard</a>
-      <a href="/about.php">About</a>
-      <a href="/contact.php">Contact</a>
-      <a href="/privacy.php">Privacy Policy</a>
-      <a href="/terms.php">Terms &amp; Conditions</a>
+      <a href="/debates/list.php" aria-label="Explore Debates">🗣 Explore Debates</a>
+      <a href="/user/dashboard.php" aria-label="Dashboard">📊 Dashboard</a>
+      <a href="/about.php" aria-label="About">ℹ️ About</a>
+      <a href="/contact.php" aria-label="Contact">✉️ Contact</a>
+      <a href="/privacy.php" aria-label="Privacy Policy">🔒 Privacy Policy</a>
+      <a href="/terms.php" aria-label="Terms and Conditions">📜 Terms &amp; Conditions</a>
     </div>
 
     <!-- Social links -->
     <div class="footer-social">
-      <a href="/"><span class="icon">🌐</span> Website</a>
-      <a href="https://twitter.com" target="_blank" rel="noopener"><span class="icon">🐦</span> Twitter</a>
-      <a href="https://facebook.com" target="_blank" rel="noopener"><span class="icon">📘</span> Facebook</a>
+      <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+        <span class="icon">📘</span> Facebook
+      </a>
+      <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+        <span class="icon">📸</span> Instagram
+      </a>
     </div>
   </div>
 
