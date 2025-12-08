@@ -235,7 +235,7 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
     .share-btn { padding:8px 12px; border-radius:8px; font-weight:600; background:transparent; border:1px solid var(--border); color:inherit; display:inline-flex; gap:8px; align-items:center; cursor:pointer; }
     .share-btn.primary { background:var(--accent); color:#fff; border:none; }
 
-    /* Chat styles: modern, neat, professional */
+    /* FIXED Chat styles: modern, neat, professional - fixed alignment */
     .chat-wrap { display:flex; flex-direction:column; gap:12px; width:100%; }
     #chatBox {
       max-height:420px;
@@ -247,21 +247,95 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
       scroll-behavior: smooth;
     }
-    .chat-message { display:flex; gap:10px; align-items:flex-end; max-width:100%; margin-bottom:10px; }
+    .chat-message { 
+      display:flex; 
+      gap:10px; 
+      margin-bottom:10px;
+      max-width:100%;
+      width:100%;
+    }
+    .chat-message.you {
+      justify-content: flex-end;
+    }
+    .chat-message.other {
+      justify-content: flex-start;
+    }
     .chat-avatar {
       width:44px; height:44px; border-radius:50%; flex:0 0 44px;
       background:linear-gradient(135deg,#2b2b2b,#111); display:flex; align-items:center; justify-content:center;
       color:#fff; font-weight:700; font-size:0.95rem; text-transform:uppercase; border:1px solid rgba(255,255,255,0.04);
     }
-    .chat-bubble { padding:10px 12px; border-radius:12px; line-height:1.35; font-size:0.95rem; max-width:78%; word-break:break-word; box-shadow: 0 6px 18px rgba(2,6,23,0.45); }
-    .chat-bubble.other { background: linear-gradient(180deg,#0f1724,#0b1220); color:#e6eef8; border:1px solid rgba(255,255,255,0.03); border-top-left-radius:4px; }
-    .chat-bubble.you { background: linear-gradient(90deg,#ff6b6b,var(--accent)); color:#fff; border: none; border-top-right-radius:4px; }
-    .chat-meta { display:flex; gap:8px; align-items:center; margin-top:6px; font-size:0.78rem; color:rgba(255,255,255,0.55); }
-    .chat-time { background: rgba(255,255,255,0.03); padding:4px 8px; border-radius:999px; font-size:0.75rem; color:rgba(255,255,255,0.65); }
+    .message-content {
+      display: flex;
+      flex-direction: column;
+      max-width: 78%;
+    }
+    .message-content.you {
+      align-items: flex-end;
+    }
+    .message-content.other {
+      align-items: flex-start;
+    }
+    .chat-bubble { 
+      padding:10px 12px; 
+      border-radius:12px; 
+      line-height:1.35; 
+      font-size:0.95rem; 
+      word-break:break-word; 
+      box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+      max-width: 100%;
+    }
+    .chat-bubble.other { 
+      background: linear-gradient(180deg,#0f1724,#0b1220); 
+      color:#e6eef8; 
+      border:1px solid rgba(255,255,255,0.03); 
+      border-top-left-radius:4px;
+    }
+    .chat-bubble.you { 
+      background: linear-gradient(90deg,#ff6b6b,var(--accent)); 
+      color:#fff; 
+      border: none; 
+      border-top-right-radius:4px;
+    }
+    .chat-meta { 
+      display:flex; 
+      gap:8px; 
+      align-items:center; 
+      margin-top:6px; 
+      font-size:0.78rem; 
+      color:rgba(255,255,255,0.55);
+      width: 100%;
+    }
+    .chat-meta.you {
+      justify-content: flex-end;
+    }
+    .chat-meta.other {
+      justify-content: flex-start;
+    }
+    .chat-time { 
+      background: rgba(255,255,255,0.03); 
+      padding:4px 8px; 
+      border-radius:999px; 
+      font-size:0.75rem; 
+      color:rgba(255,255,255,0.65);
+    }
 
     /* Delete button small */
-    .msg-actions { margin-left:8px; display:flex; gap:6px; align-items:center; }
-    .msg-delete { background:transparent; border:1px solid rgba(255,255,255,0.06); color:inherit; padding:6px 8px; border-radius:8px; cursor:pointer; font-weight:600; }
+    .msg-actions { 
+      display:inline-flex; 
+      gap:6px; 
+      align-items:center; 
+      margin-left: 8px;
+    }
+    .msg-delete { 
+      background:transparent; 
+      border:1px solid rgba(255,255,255,0.06); 
+      color:inherit; 
+      padding:6px 8px; 
+      border-radius:8px; 
+      cursor:pointer; 
+      font-weight:600;
+    }
 
     /* Input row: keep previous red send button style */
     .chat-input-row { display:flex; gap:8px; margin-top:12px; align-items:center; }
@@ -343,7 +417,8 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
     @media (max-width:640px) {
       .container { padding:0 10px; }
       .chat-avatar { width:36px; height:36px; flex:0 0 36px; font-size:0.85rem; }
-      .chat-bubble { max-width:72%; padding:9px 10px; }
+      .message-content { max-width: 82%; }
+      .chat-bubble { padding:9px 10px; }
       #chatBox { max-height:300px; padding:10px; }
       .share-row { gap:6px; }
       .share-btn, .btn { padding:8px 10px; font-size:0.95rem; }
@@ -406,25 +481,36 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
             <?php if (!$isYou): ?>
               <div class="chat-avatar"><?= htmlspecialchars($initials) ?></div>
             <?php endif; ?>
-
-            <div style="display:flex;flex-direction:column;align-items:<?= $isYou ? 'flex-end' : 'flex-start' ?>;">
-              <div style="display:flex;align-items:flex-start;gap:8px;">
+            
+            <div class="message-content <?= $isYou ? 'you' : 'other' ?>">
+              <div style="display:flex; align-items:flex-start; width:100%;">
+                <?php if ($isYou): ?>
+                  <?php if ($canDelete): ?>
+                    <div class="msg-actions">
+                      <button class="msg-delete" data-msg-id="<?= (int)$m['id'] ?>" title="Delete message">🗑️</button>
+                    </div>
+                  <?php endif; ?>
+                <?php endif; ?>
+                
                 <div class="chat-bubble <?= $isYou ? 'you' : 'other' ?>"><?= $text ?></div>
-                <?php if ($canDelete): ?>
-                  <div class="msg-actions">
-                    <button class="msg-delete" data-msg-id="<?= (int)$m['id'] ?>" title="Delete message">🗑️</button>
-                  </div>
+                
+                <?php if (!$isYou): ?>
+                  <?php if ($canDelete): ?>
+                    <div class="msg-actions">
+                      <button class="msg-delete" data-msg-id="<?= (int)$m['id'] ?>" title="Delete message">🗑️</button>
+                    </div>
+                  <?php endif; ?>
                 <?php endif; ?>
               </div>
-
-              <div class="chat-meta">
+              
+              <div class="chat-meta <?= $isYou ? 'you' : 'other' ?>">
                 <div style="font-weight:700;font-size:0.85rem;color:<?= $isYou ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.8)' ?>;">
                   <?= htmlspecialchars($name) ?>
                 </div>
                 <div class="chat-time"><?= date('H:i', $ts) ?></div>
               </div>
             </div>
-
+            
             <?php if ($isYou): ?>
               <div class="chat-avatar"><?= htmlspecialchars($initials) ?></div>
             <?php endif; ?>
@@ -485,7 +571,7 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
         </div>
       </div>
 
-      <div id="status" class="label" style="margin-top:8px">Ready. Click “Enable camera & mic”.</div>
+      <div id="status" class="label" style="margin-top:8px">Ready. Click "Enable camera & mic".</div>
     <?php else: ?>
       <p class="label">Join the debate to enable audio/video calls.</p>
     <?php endif; ?>
@@ -574,21 +660,18 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
       avatar.textContent = initials(opts.name || 'User');
 
       const container = document.createElement('div');
-      container.style.display = 'flex';
-      container.style.flexDirection = 'column';
-      container.style.alignItems = opts.isYou ? 'flex-end' : 'flex-start';
+      container.className = 'message-content ' + (opts.isYou ? 'you' : 'other');
 
       const topRow = document.createElement('div');
       topRow.style.display = 'flex';
       topRow.style.alignItems = 'flex-start';
-      topRow.style.gap = '8px';
+      topRow.style.width = '100%';
 
       const bubble = document.createElement('div');
       bubble.className = 'chat-bubble ' + (opts.isYou ? 'you' : 'other');
       bubble.innerHTML = escapeHtml(opts.text);
 
-      topRow.appendChild(bubble);
-
+      // Add delete button in correct position
       if (opts.canDelete) {
         const actions = document.createElement('div');
         actions.className = 'msg-actions';
@@ -599,11 +682,21 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
         delBtn.textContent = '🗑️';
         delBtn.addEventListener('click', onDeleteClick);
         actions.appendChild(delBtn);
-        topRow.appendChild(actions);
+        
+        if (opts.isYou) {
+          topRow.appendChild(actions);
+          topRow.appendChild(bubble);
+        } else {
+          topRow.appendChild(bubble);
+          topRow.appendChild(actions);
+        }
+      } else {
+        topRow.appendChild(bubble);
       }
 
       const meta = document.createElement('div');
-      meta.className = 'chat-meta';
+      meta.className = 'chat-meta ' + (opts.isYou ? 'you' : 'other');
+      
       const nameEl = document.createElement('div');
       nameEl.style.fontWeight = '700';
       nameEl.style.fontSize = '0.85rem';
