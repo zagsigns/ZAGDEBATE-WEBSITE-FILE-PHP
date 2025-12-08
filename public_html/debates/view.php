@@ -160,6 +160,135 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
 <head>
   <?php $meta_title = htmlspecialchars($debate['title']) . ' • Debate • ZAG DEBATE'; include __DIR__ . '/../seo/meta.php'; ?>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    /* Video call UI improvements: fixed selfie, responsive grid, controls */
+    /* Remote videos grid */
+    #remoteVideos {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    #remoteVideos .video-wrap {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #000;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    }
+    #remoteVideos video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      cursor: pointer;
+      transition: transform .28s ease, box-shadow .28s ease;
+    }
+    #remoteVideos .video-meta {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      background: rgba(0,0,0,0.45);
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    #remoteVideos video.zoomed {
+      transform: scale(1.02);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.6);
+      z-index: 2500;
+    }
+
+    /* Local selfie fixed box */
+    #localVideo {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      width: 120px;
+      height: 160px;
+      border-radius: 12px;
+      border: 2px solid var(--accent);
+      object-fit: cover;
+      cursor: pointer;
+      z-index: 3000;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      transition: all .28s ease;
+      background: #000;
+    }
+    #localVideo.zoomed {
+      width: 80%;
+      height: 70%;
+      bottom: 50%;
+      right: 50%;
+      transform: translate(50%, 50%);
+      z-index: 4000;
+      border-radius: 12px;
+    }
+
+    /* Floating control bar */
+    .call-controls {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 18px;
+      display:flex;
+      gap:12px;
+      z-index: 3500;
+      background: rgba(12,19,32,0.85);
+      padding: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.04);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      align-items:center;
+    }
+    .control-btn {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius: 999px;
+      background: transparent;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer;
+      font-weight:700;
+      transition: transform .12s ease, background .12s ease;
+    }
+    .control-btn:hover { transform: translateY(-3px); }
+    .control-btn.danger {
+      background: linear-gradient(90deg,#ef4444,#dc2626);
+      border: none;
+      color: #fff;
+    }
+    .control-btn.toggled {
+      background: rgba(255,255,255,0.06);
+    }
+
+    /* Status label */
+    #status {
+      margin-top: 8px;
+      color: var(--muted);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      #localVideo { width: 100px; height: 140px; bottom: 14px; right: 14px; }
+      .call-controls { bottom: 14px; padding: 6px; gap:8px; }
+      #remoteVideos { gap: 8px; }
+    }
+    @media (max-width: 520px) {
+      #localVideo { width: 92px; height: 120px; bottom: 12px; right: 12px; }
+      .call-controls { bottom: 12px; gap:6px; padding:6px; }
+      .control-btn { padding:8px 10px; font-size:0.95rem; }
+      #remoteVideos { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 <?php include __DIR__ . '/../includes/header.php'; ?>
@@ -257,10 +386,20 @@ if (!empty($validGallery)): ?>
         <button class="btn" id="leaveBtn" style="margin-left:8px">Leave call</button>
       </div>
 
-      <video id="localVideo" autoplay muted playsinline
-             style="width:100%;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;"></video>
+      <!-- Floating control bar (will be shown once camera enabled) -->
+      <div id="callControls" class="call-controls" style="display:none" aria-hidden="true">
+        <button id="muteBtn" class="control-btn" title="Mute / Unmute">🔇</button>
+        <button id="camBtn" class="control-btn" title="Toggle Camera">📷</button>
+        <button id="switchBtn" class="control-btn" title="Switch Camera">🔁</button>
+        <button id="hangupBtn" class="control-btn danger" title="Leave call">📴</button>
+      </div>
 
-      <div id="remoteVideos" class="grid"></div>
+      <!-- Local selfie video (fixed) -->
+      <video id="localVideo" autoplay muted playsinline></video>
+
+      <!-- Remote videos grid -->
+      <div id="remoteVideos" class="grid" aria-live="polite" style="margin-top:12px"></div>
+
       <div id="status" class="label" style="margin-top:8px">Ready. Click “Enable camera & mic”.</div>
     <?php else: ?>
       <p class="label">Join the debate to enable audio/video calls.</p>
@@ -288,10 +427,136 @@ const localVideo = document.getElementById('localVideo');
 const remoteVideos = document.getElementById('remoteVideos');
 const statusLabel = document.getElementById('status');
 
+const callControls = document.getElementById('callControls');
+const muteBtn = document.getElementById('muteBtn');
+const camBtn = document.getElementById('camBtn');
+const switchBtn = document.getElementById('switchBtn');
+const hangupBtn = document.getElementById('hangupBtn');
+
+let audioEnabled = true;
+let videoEnabled = true;
+let currentFacingMode = 'user'; // 'user' or 'environment'
+
 function updateStatus(msg) {
   if (statusLabel) statusLabel.textContent = msg;
   console.log('[WebRTC]', msg);
 }
+
+function showControls(show = true) {
+  if (!callControls) return;
+  callControls.style.display = show ? 'flex' : 'none';
+  callControls.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+// Toggle mute/unmute
+function toggleMute() {
+  if (!localStream) return;
+  const audioTracks = localStream.getAudioTracks();
+  audioEnabled = !audioEnabled;
+  audioTracks.forEach(t => t.enabled = audioEnabled);
+  muteBtn.textContent = audioEnabled ? '🔇' : '🔈';
+  muteBtn.classList.toggle('toggled', !audioEnabled);
+}
+
+// Toggle camera on/off
+function toggleCamera() {
+  if (!localStream) return;
+  const videoTracks = localStream.getVideoTracks();
+  videoEnabled = !videoEnabled;
+  videoTracks.forEach(t => t.enabled = videoEnabled);
+  camBtn.textContent = videoEnabled ? '📷' : '🚫';
+  camBtn.classList.toggle('toggled', !videoEnabled);
+}
+
+// Switch camera (front/back) - best effort
+async function switchCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+      video: { facingMode: { exact: currentFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    // Replace tracks in localStream and in peers
+    const newVideoTrack = newStream.getVideoTracks()[0];
+    const oldVideoTrack = localStream.getVideoTracks()[0];
+    if (oldVideoTrack) oldVideoTrack.stop();
+
+    // Replace localStream reference
+    localStream.removeTrack(oldVideoTrack);
+    localStream.addTrack(newVideoTrack);
+
+    // Update local video element
+    localVideo.srcObject = null;
+    localVideo.srcObject = localStream;
+
+    // Replace track in each peer connection
+    Object.values(peers).forEach(p => {
+      try {
+        const sender = p._pc && p._pc.getSenders && p._pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(newVideoTrack);
+      } catch (e) {
+        // ignore if not supported
+      }
+    });
+
+    updateStatus('Camera switched.');
+  } catch (err) {
+    // Fallback: try without exact constraint
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const oldVideoTrack = localStream.getVideoTracks()[0];
+      if (oldVideoTrack) oldVideoTrack.stop();
+      localStream.removeTrack(oldVideoTrack);
+      localStream.addTrack(newVideoTrack);
+      localVideo.srcObject = null;
+      localVideo.srcObject = localStream;
+      Object.values(peers).forEach(p => {
+        try {
+          const sender = p._pc && p._pc.getSenders && p._pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) sender.replaceTrack(newVideoTrack);
+        } catch (e) {}
+      });
+      updateStatus('Camera switched (fallback).');
+    } catch (e) {
+      updateStatus('Could not switch camera: ' + e.message);
+    }
+  }
+}
+
+// Toggle zoom for local selfie video
+localVideo?.addEventListener('click', () => {
+  localVideo.classList.toggle('zoomed');
+});
+
+// Toggle zoom for remote videos (event delegation)
+remoteVideos?.addEventListener('click', e => {
+  const v = e.target;
+  if (v && v.tagName === 'VIDEO') {
+    v.classList.toggle('zoomed');
+    // If zoomed, unzoom other videos
+    if (v.classList.contains('zoomed')) {
+      document.querySelectorAll('#remoteVideos video').forEach(other => {
+        if (other !== v) other.classList.remove('zoomed');
+      });
+      // also unzoom local
+      localVideo.classList.remove('zoomed');
+    }
+  }
+});
+
+// Attach control handlers
+muteBtn?.addEventListener('click', toggleMute);
+camBtn?.addEventListener('click', toggleCamera);
+switchBtn?.addEventListener('click', switchCamera);
+hangupBtn?.addEventListener('click', () => {
+  // reuse leaveBtn logic
+  leaveBtn?.click();
+});
 
 startBtn?.addEventListener('click', async () => {
   try {
@@ -310,8 +575,16 @@ startBtn?.addEventListener('click', async () => {
     updateStatus('Requesting camera and mic...');
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
+
+    // show controls
+    showControls(true);
+    // set initial control states
+    audioEnabled = true;
+    videoEnabled = true;
+    muteBtn.textContent = '🔇';
+    camBtn.textContent = '📷';
 
     localVideo.srcObject = localStream;
     updateStatus('Camera/mic enabled. Connecting to signaling server...');
@@ -363,6 +636,7 @@ leaveBtn?.addEventListener('click', () => {
     socket.disconnect();
     socket = null;
   }
+  showControls(false);
   updateStatus('Left the call.');
 });
 
@@ -374,6 +648,7 @@ function createPeer(id, initiator) {
     config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
   });
 
+  // store underlying RTCPeerConnection for track replacement if available
   peer.on('signal', signal => {
     socket?.emit('signal', { roomId, signal, target: id });
   });
@@ -389,37 +664,103 @@ function createPeer(id, initiator) {
     updateStatus('Peer error (' + id + '): ' + err.message);
   });
 
+  // expose underlying pc if available (SimplePeer internal)
+  try {
+    if (peer._pc) peer._pc = peer._pc;
+  } catch (e) {}
+
+  peers[id] = peer;
   return peer;
 }
 
 function destroyPeer(id) {
   const p = peers[id];
   if (p) {
-    p.destroy();
+    try { p.destroy(); } catch (e) {}
     delete peers[id];
   }
   removeRemoteVideo(id);
 }
 
 function addRemoteVideo(id, stream) {
-  let video = document.getElementById('video-' + id);
-  if (!video) {
-    video = document.createElement('video');
+  // create wrapper
+  let wrap = document.getElementById('wrap-' + id);
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'wrap-' + id;
+    wrap.className = 'video-wrap';
+    // meta overlay
+    const meta = document.createElement('div');
+    meta.className = 'video-meta';
+    meta.textContent = 'Participant';
+    wrap.appendChild(meta);
+
+    const video = document.createElement('video');
     video.id = 'video-' + id;
     video.autoplay = true;
     video.playsInline = true;
+    video.setAttribute('data-peer-id', id);
     video.style.width = '100%';
-    video.style.borderRadius = '8px';
-    video.style.border = '1px solid var(--border)';
-    remoteVideos.appendChild(video);
+    video.style.height = '100%';
+    wrap.appendChild(video);
+
+    remoteVideos.appendChild(wrap);
   }
-  video.srcObject = stream;
+  const videoEl = wrap.querySelector('video');
+  if (videoEl) videoEl.srcObject = stream;
 }
 
 function removeRemoteVideo(id) {
-  const el = document.getElementById('video-' + id);
-  if (el) el.remove();
+  const wrap = document.getElementById('wrap-' + id);
+  if (wrap) wrap.remove();
 }
+
+// Optional: small visual pulse when someone speaks (basic)
+// Not a full VAD implementation; just a simple highlight when audio track exists
+function tryAttachAudioIndicator(stream, wrapId) {
+  try {
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks || audioTracks.length === 0) return;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const wrap = document.getElementById(wrapId);
+    function tick() {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      if (wrap) {
+        wrap.style.boxShadow = avg > 20 ? '0 18px 40px rgba(16,185,129,0.18)' : '0 6px 18px rgba(0,0,0,0.35)';
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (e) {
+    // ignore
+  }
+}
+
+// When a new remote stream is added, try to attach indicator
+// We call tryAttachAudioIndicator inside addRemoteVideo after setting srcObject
+// but since streams arrive asynchronously, we attach a small timeout to attempt
+const origAddRemoteVideo = addRemoteVideo;
+addRemoteVideo = function(id, stream) {
+  origAddRemoteVideo(id, stream);
+  setTimeout(() => {
+    tryAttachAudioIndicator(stream, 'wrap-' + id);
+  }, 500);
+};
+
+// Ensure remoteVideos is keyboard accessible: allow Enter to toggle zoom
+remoteVideos?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target && e.target.tagName === 'VIDEO') {
+    e.target.classList.toggle('zoomed');
+  }
+});
 </script>
 </body>
 </html>
