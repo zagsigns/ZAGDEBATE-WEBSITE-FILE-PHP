@@ -151,7 +151,7 @@ if (session_status() === PHP_SESSION_NONE) {
         <?php if ($_SESSION['user']['role'] === 'admin'): ?>
           <a href="/admin/dashboard.php" class="btn">👤📊 Admin Dashboard</a>
         <?php endif; ?>
-        <a href="/auth/logout.php" class="btn" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
+        <a href="/auth/logout.php" class="btn" onclick="return confirm('Are you sure you want to logout?');">👤➡️ Logout</a>
       <?php else: ?>
         <a href="/auth/register.php" class="btn"> 👤➕ User Register</a>
         <a href="/auth/login.php" class="btn">👤🔑 Login</a>
@@ -174,7 +174,7 @@ if (session_status() === PHP_SESSION_NONE) {
       <?php if ($_SESSION['user']['role'] === 'admin'): ?>
         <a href="/admin/dashboard.php">👤📊 Admin Dashboard</a>
       <?php endif; ?>
-      <a href="/auth/logout.php" onclick="return confirm('Are you sure you want to logout?');">Logout</a>
+      <a href="/auth/logout.php" onclick="return confirm('Are you sure you want to logout?');">👤➡️ Logout</a>
     <?php else: ?>
       <a href="/auth/register.php">👤➕ User Register</a>
       <a href="/auth/login.php">👤🔑 Login</a>

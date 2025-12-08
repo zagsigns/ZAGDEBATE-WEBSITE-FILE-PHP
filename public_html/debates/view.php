@@ -144,153 +144,156 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
   <?php $meta_title = htmlspecialchars($debate['title']) . ' • Debate • ZAG DEBATE'; include __DIR__ . '/../seo/meta.php'; ?>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    /* Video call UI: polished layout */
+    /* ===== Group call: compact professional grid ===== */
+
     :root {
-      --call-bg: rgba(12,19,32,0.85);
-      --control-bg: rgba(255,255,255,0.04);
+      --video-gap: 10px;
+      --video-min: 110px;
+      --video-min-desktop: 160px;
+      --video-radius: 10px;
+      --video-border: rgba(255,255,255,0.06);
+      --accent: #ff3b30;
     }
 
-    /* Remote videos grid */
+    /* Container */
     #remoteVideos {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
+      gap: var(--video-gap);
       margin-top: 12px;
+      align-items: stretch;
+      justify-items: stretch;
     }
+
+    /* Responsive columns: adapt to screen and participant count via JS */
+    /* default fallback */
+    #remoteVideos.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+    #remoteVideos.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+    #remoteVideos.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+    #remoteVideos.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+    #remoteVideos.grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
+
+    /* Video tile */
     .video-wrap {
       position: relative;
       overflow: hidden;
-      border-radius: 12px;
-      border: 1px solid var(--border);
+      border-radius: var(--video-radius);
+      border: 1px solid var(--video-border);
       background: #000;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-      min-height: 140px;
+      min-height: 90px;
+      height: 100%;
       display:flex;
       align-items:center;
       justify-content:center;
+      transition: transform .22s ease, box-shadow .22s ease;
+      cursor: pointer;
     }
+
     .video-wrap video {
       width: 100%;
       height: 100%;
-      display: block;
       object-fit: cover;
-      cursor: pointer;
-      transition: transform .28s ease, box-shadow .28s ease;
+      display:block;
     }
+
+    /* Small overlay label */
     .video-meta {
       position: absolute;
       left: 8px;
       bottom: 8px;
       background: rgba(0,0,0,0.45);
       color: #fff;
-      padding: 6px 8px;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
       display:flex;
       gap:8px;
       align-items:center;
-    }
-    .video-wrap.zoomed {
-      grid-column: 1 / -1;
-      height: 70vh;
-      z-index: 2500;
-    }
-    .video-wrap.zoomed video {
-      transform: scale(1.02);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.6);
+      pointer-events: none;
     }
 
-    /* Local selfie fixed box */
+    /* Active speaker highlight */
+    .video-wrap.speaking {
+      box-shadow: 0 8px 30px rgba(16,185,129,0.12);
+      border-color: rgba(16,185,129,0.35);
+      transform: translateY(-4px);
+    }
+
+    /* Zoomed tile (clicked) */
+    .video-wrap.zoomed {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 92vw;
+      height: 72vh;
+      transform: translate(-50%, -50%);
+      z-index: 4000;
+      border-radius: 12px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    }
+    .video-wrap.zoomed video { object-fit: contain; }
+
+    /* Local selfie (small fixed) */
     #localVideo {
       position: fixed;
-      bottom: 18px;
-      right: 18px;
-      width: 120px;
-      height: 160px;
-      border-radius: 12px;
+      bottom: 16px;
+      right: 16px;
+      width: 96px;
+      height: 128px;
+      border-radius: 10px;
       border: 2px solid var(--accent);
       object-fit: cover;
+      z-index: 4500;
       cursor: pointer;
-      z-index: 3000;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-      transition: all .28s ease;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+      transition: transform .22s ease, width .22s ease, height .22s ease;
       background: #000;
     }
     #localVideo.zoomed {
-      width: 80%;
-      height: 70%;
-      bottom: 50%;
-      right: 50%;
-      transform: translate(50%, 50%);
-      z-index: 4000;
-      border-radius: 12px;
+      width: 90vw;
+      height: 72vh;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5000;
     }
 
-    /* Floating control bar */
+    /* Controls bar */
     .call-controls {
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
       bottom: 18px;
       display:flex;
-      gap:12px;
-      z-index: 3500;
-      background: var(--call-bg);
+      gap:10px;
+      z-index: 4600;
+      background: rgba(12,19,32,0.88);
       padding: 8px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.04);
       box-shadow: 0 10px 30px rgba(0,0,0,0.45);
       align-items:center;
     }
-    .control-btn {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius: 999px;
-      background: transparent;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.06);
-      cursor: pointer;
-      font-weight:700;
-      transition: transform .12s ease, background .12s ease;
-    }
-    .control-btn:hover { transform: translateY(-3px); }
-    .control-btn.danger {
-      background: linear-gradient(90deg,#ef4444,#dc2626);
-      border: none;
-      color: #fff;
-    }
-    .control-btn.toggled {
-      background: rgba(255,255,255,0.06);
-    }
+    .control-btn { padding:10px 12px; border-radius:999px; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.06); cursor:pointer; font-weight:700; }
+    .control-btn.danger { background: linear-gradient(90deg,#ef4444,#dc2626); border:none; }
 
-    /* Status label */
-    #status {
-      margin-top: 8px;
-      color: var(--muted);
-    }
+    /* Placeholder */
+    .video-empty { color: var(--muted); font-size:0.95rem; padding:18px; text-align:center; }
 
-    /* Responsive */
-    @media (max-width: 900px) {
-      #localVideo { width: 100px; height: 140px; bottom: 14px; right: 14px; }
-      .call-controls { bottom: 14px; padding: 6px; gap:8px; }
-      #remoteVideos { gap: 8px; }
+    /* Responsive adjustments */
+    @media (max-width: 1100px) {
+      :root { --video-min-desktop: 140px; }
+      #localVideo { width: 88px; height: 120px; }
+    }
+    @media (max-width: 800px) {
+      /* on small screens use 2-3 columns depending on count (JS will set classes) */
+      #localVideo { width: 84px; height: 112px; bottom: 12px; right: 12px; }
+      .call-controls { bottom: 12px; gap:8px; padding:6px; }
     }
     @media (max-width: 520px) {
-      #localVideo { width: 92px; height: 120px; bottom: 12px; right: 12px; }
-      .call-controls { bottom: 12px; gap:6px; padding:6px; }
-      .control-btn { padding:8px 10px; font-size:0.95rem; }
-      #remoteVideos { grid-template-columns: 1fr; }
-    }
-
-    /* Small helper for empty state */
-    .video-empty {
-      color: var(--muted);
-      font-size: 0.95rem;
-      padding: 18px;
-      text-align:center;
+      /* mobile: small thumbnails stacked in grid */
+      #localVideo { width: 76px; height: 100px; bottom: 10px; right: 10px; }
+      .video-wrap { min-height: 96px; }
+      .call-controls { bottom: 10px; gap:6px; padding:6px; }
     }
   </style>
 </head>
@@ -401,7 +404,7 @@ if (!empty($validGallery)): ?>
       <video id="localVideo" autoplay muted playsinline></video>
 
       <!-- Remote videos grid -->
-      <div id="remoteVideos" class="grid" aria-live="polite" style="margin-top:12px">
+      <div id="remoteVideos" class="grid grid-cols-3" aria-live="polite" style="margin-top:12px">
         <div class="video-empty">No participants yet. Enable camera & mic to join the call.</div>
       </div>
 
@@ -419,22 +422,17 @@ if (!empty($validGallery)): ?>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
 <script>
-/*
-  Robust signaling + WebRTC logic.
-  Replace the inline script in view.php with this block (already placed).
-  If you have a TURN server, add credentials to ICE_SERVERS below.
+/* ===== Compact group call behavior =====
+   - Responsive grid columns are set by JS based on participant count and screen width
+   - Thumbnails remain small; click to zoom
+   - Active speaker visual pulse (best-effort)
+   - Selfie remains fixed and clickable
 */
 
-/* ICE servers: add TURN credentials here if available */
+/* ICE servers (add TURN credentials if available) */
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  // Example TURN (uncomment and replace with your TURN server)
-  // {
-  //   urls: ['turn:turn.example.com:3478?transport=udp', 'turn:turn.example.com:3478?transport=tcp', 'turns:turn.example.com:5349?transport=tcp'],
-  //   username: 'TURN_USER',
-  //   credential: 'TURN_PASS'
-  // }
+  { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
 const signalingURL = 'https://zagdebate-signaling.onrender.com';
@@ -442,7 +440,8 @@ const roomId = 'debate-' + <?= (int)$debate['id'] ?>;
 
 let socket = null;
 let localStream = null;
-const peers = {};
+const peers = {}; // id -> peer
+const peerMeta = {}; // id -> {joinedAt, label}
 
 const startBtn = document.getElementById('startBtn');
 const leaveBtn = document.getElementById('leaveBtn');
@@ -460,43 +459,170 @@ let audioEnabled = true;
 let videoEnabled = true;
 let currentFacingMode = 'user';
 
+/* Utility: update status */
 function updateStatus(msg) {
   if (statusLabel) statusLabel.textContent = msg;
   console.log('[WebRTC]', msg);
 }
 
+/* Show/hide controls */
 function showControls(show = true) {
   if (!callControls) return;
   callControls.style.display = show ? 'flex' : 'none';
   callControls.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
-/* Toggle mute/unmute */
-function toggleMute() {
+/* Grid layout helper: choose columns based on count and width */
+function layoutGrid() {
+  const count = remoteVideos.querySelectorAll('.video-wrap').length;
+  const w = window.innerWidth;
+  let cols = 3;
+
+  if (w <= 520) {
+    // mobile: 1 or 2 columns
+    cols = Math.min(2, Math.max(1, Math.ceil(Math.sqrt(count))));
+  } else if (w <= 900) {
+    // small tablet: 2-3 columns
+    cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(count))));
+  } else {
+    // desktop: up to 4 columns, but keep thumbnails compact
+    cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(count))));
+  }
+
+  // set class
+  remoteVideos.classList.remove('grid-cols-1','grid-cols-2','grid-cols-3','grid-cols-4','grid-cols-5');
+  remoteVideos.classList.add('grid-cols-' + cols);
+}
+
+/* Create or update a remote video tile */
+function addRemoteVideo(id, stream, label = 'Participant') {
+  let wrap = document.getElementById('wrap-' + id);
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'wrap-' + id;
+    wrap.className = 'video-wrap';
+    wrap.setAttribute('data-peer-id', id);
+
+    const video = document.createElement('video');
+    video.id = 'video-' + id;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = false;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    wrap.appendChild(video);
+
+    const meta = document.createElement('div');
+    meta.className = 'video-meta';
+    meta.textContent = label;
+    wrap.appendChild(meta);
+
+    // click handler: toggle zoom
+    wrap.addEventListener('click', (e) => {
+      // if already zoomed, unzoom; else zoom this and unzoom others
+      const isZoomed = wrap.classList.toggle('zoomed');
+      if (isZoomed) {
+        document.querySelectorAll('#remoteVideos .video-wrap').forEach(other => {
+          if (other !== wrap) other.classList.remove('zoomed');
+        });
+        localVideo.classList.remove('zoomed');
+      }
+    });
+
+    // append and remove placeholder if present
+    const placeholder = remoteVideos.querySelector('.video-empty');
+    if (placeholder) placeholder.remove();
+    remoteVideos.appendChild(wrap);
+    layoutGrid();
+  }
+
+  const videoEl = wrap.querySelector('video');
+  if (videoEl) {
+    try {
+      videoEl.srcObject = stream;
+    } catch (e) {
+      // fallback: create object URL (older browsers)
+      try { videoEl.src = URL.createObjectURL(stream); } catch (err) {}
+    }
+  }
+
+  // try attach audio indicator
+  tryAttachAudioIndicator(stream, wrap.id);
+}
+
+/* Remove tile */
+function removeRemoteVideo(id) {
+  const wrap = document.getElementById('wrap-' + id);
+  if (wrap) wrap.remove();
+  layoutGrid();
+  if (!remoteVideos.querySelector('.video-wrap')) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'video-empty';
+    placeholder.textContent = 'No participants yet. Enable camera & mic to join the call.';
+    remoteVideos.appendChild(placeholder);
+  }
+}
+
+/* Small VAD: highlight speaking participant (best-effort) */
+function tryAttachAudioIndicator(stream, wrapId) {
+  try {
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks || audioTracks.length === 0) return;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const wrap = document.getElementById(wrapId);
+    function tick() {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      if (wrap) {
+        if (avg > 20) wrap.classList.add('speaking'); else wrap.classList.remove('speaking');
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (e) {
+    // ignore if not supported
+  }
+}
+
+/* Local selfie click toggles zoom */
+localVideo?.addEventListener('click', () => {
+  localVideo.classList.toggle('zoomed');
+  // unzoom remote tiles when local zoomed
+  if (localVideo.classList.contains('zoomed')) {
+    document.querySelectorAll('#remoteVideos .video-wrap').forEach(w => w.classList.remove('zoomed'));
+  }
+});
+
+/* Keyboard accessibility: Enter toggles zoom on focused tile */
+remoteVideos?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target && e.target.closest('.video-wrap')) {
+    e.target.closest('.video-wrap').classList.toggle('zoomed');
+  }
+});
+
+/* Control handlers */
+muteBtn?.addEventListener('click', () => {
   if (!localStream) return;
-  const audioTracks = localStream.getAudioTracks();
   audioEnabled = !audioEnabled;
-  audioTracks.forEach(t => t.enabled = audioEnabled);
-  if (muteBtn) {
-    muteBtn.textContent = audioEnabled ? '🔇' : '🔈';
-    muteBtn.classList.toggle('toggled', !audioEnabled);
-  }
-}
-
-/* Toggle camera */
-function toggleCamera() {
+  localStream.getAudioTracks().forEach(t => t.enabled = audioEnabled);
+  muteBtn.textContent = audioEnabled ? '🔇' : '🔈';
+  muteBtn.classList.toggle('toggled', !audioEnabled);
+});
+camBtn?.addEventListener('click', () => {
   if (!localStream) return;
-  const videoTracks = localStream.getVideoTracks();
   videoEnabled = !videoEnabled;
-  videoTracks.forEach(t => t.enabled = videoEnabled);
-  if (camBtn) {
-    camBtn.textContent = videoEnabled ? '📷' : '🚫';
-    camBtn.classList.toggle('toggled', !videoEnabled);
-  }
-}
-
-/* Switch camera (front/back) */
-async function switchCamera() {
+  localStream.getVideoTracks().forEach(t => t.enabled = videoEnabled);
+  camBtn.textContent = videoEnabled ? '📷' : '🚫';
+  camBtn.classList.toggle('toggled', !videoEnabled);
+});
+switchBtn?.addEventListener('click', async () => {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
   currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
   try {
@@ -507,13 +633,10 @@ async function switchCamera() {
     const newVideoTrack = newStream.getVideoTracks()[0];
     const oldVideoTrack = localStream.getVideoTracks()[0];
     if (oldVideoTrack) oldVideoTrack.stop();
-
     try { localStream.removeTrack(oldVideoTrack); } catch(e) {}
     localStream.addTrack(newVideoTrack);
-
     localVideo.srcObject = null;
     localVideo.srcObject = localStream;
-
     Object.values(peers).forEach(p => {
       try {
         const senders = p._pc && p._pc.getSenders && p._pc.getSenders();
@@ -523,14 +646,14 @@ async function switchCamera() {
         }
       } catch (e) {}
     });
-
     updateStatus('Camera switched.');
   } catch (err) {
     updateStatus('Could not switch camera: ' + err.message);
   }
-}
+});
+hangupBtn?.addEventListener('click', () => leaveBtn?.click());
 
-/* Create socket with reconnection options */
+/* Socket + peer logic (robust) */
 function createSocket() {
   socket = io(signalingURL, {
     transports: ['websocket'],
@@ -568,7 +691,7 @@ function createSocket() {
   });
 }
 
-/* Create a SimplePeer instance with timeouts and retries */
+/* Create peer with trickle ICE and timeouts */
 function createPeer(id, initiator) {
   const peer = new SimplePeer({
     initiator,
@@ -609,7 +732,8 @@ function createPeer(id, initiator) {
 
   peer.on('stream', remoteStream => {
     clearTimeout(connectTimer);
-    addRemoteVideo(id, remoteStream);
+    // label can be improved to show user name if available
+    addRemoteVideo(id, remoteStream, 'Participant');
     updateStatus('Received remote stream from ' + id);
   });
 
@@ -635,110 +759,7 @@ function destroyPeer(id) {
   removeRemoteVideo(id);
 }
 
-function addRemoteVideo(id, stream) {
-  let wrap = document.getElementById('wrap-' + id);
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'wrap-' + id;
-    wrap.className = 'video-wrap';
-
-    const meta = document.createElement('div');
-    meta.className = 'video-meta';
-    meta.textContent = 'Participant';
-    wrap.appendChild(meta);
-
-    const video = document.createElement('video');
-    video.id = 'video-' + id;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.setAttribute('data-peer-id', id);
-    video.style.width = '100%';
-    video.style.height = '100%';
-    wrap.appendChild(video);
-
-    // remove placeholder if present
-    const placeholder = remoteVideos.querySelector('.video-empty');
-    if (placeholder) placeholder.remove();
-
-    remoteVideos.appendChild(wrap);
-  }
-  const videoEl = wrap.querySelector('video');
-  if (videoEl) {
-    videoEl.srcObject = stream;
-    tryAttachAudioIndicator(stream, 'wrap-' + id);
-  }
-}
-
-function removeRemoteVideo(id) {
-  const wrap = document.getElementById('wrap-' + id);
-  if (wrap) wrap.remove();
-  // if no participants left, show placeholder
-  if (!remoteVideos.querySelector('.video-wrap')) {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'video-empty';
-    placeholder.textContent = 'No participants yet. Enable camera & mic to join the call.';
-    remoteVideos.appendChild(placeholder);
-  }
-}
-
-/* Basic audio activity visual (best-effort) */
-function tryAttachAudioIndicator(stream, wrapId) {
-  try {
-    const audioTracks = stream.getAudioTracks();
-    if (!audioTracks || audioTracks.length === 0) return;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    src.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const wrap = document.getElementById(wrapId);
-    function tick() {
-      analyser.getByteFrequencyData(data);
-      let sum = 0;
-      for (let i = 0; i < data.length; i++) sum += data[i];
-      const avg = sum / data.length;
-      if (wrap) {
-        wrap.style.boxShadow = avg > 20 ? '0 18px 40px rgba(16,185,129,0.18)' : '0 6px 18px rgba(0,0,0,0.35)';
-      }
-      requestAnimationFrame(tick);
-    }
-    tick();
-  } catch (e) { /* ignore */ }
-}
-
-/* UI interactions */
-localVideo?.addEventListener('click', () => {
-  localVideo.classList.toggle('zoomed');
-});
-
-remoteVideos?.addEventListener('click', e => {
-  const v = e.target;
-  if (v && v.tagName === 'VIDEO') {
-    const wrap = v.closest('.video-wrap');
-    if (!wrap) return;
-    const isZoomed = wrap.classList.toggle('zoomed');
-    if (isZoomed) {
-      document.querySelectorAll('#remoteVideos .video-wrap').forEach(other => {
-        if (other !== wrap) other.classList.remove('zoomed');
-      });
-      localVideo.classList.remove('zoomed');
-    }
-  }
-});
-
-remoteVideos?.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target && e.target.tagName === 'VIDEO') {
-    e.target.classList.toggle('zoomed');
-  }
-});
-
-muteBtn?.addEventListener('click', toggleMute);
-camBtn?.addEventListener('click', toggleCamera);
-switchBtn?.addEventListener('click', switchCamera);
-hangupBtn?.addEventListener('click', () => leaveBtn?.click());
-
-/* Start / Leave */
+/* Start / Leave handlers */
 startBtn?.addEventListener('click', async () => {
   try {
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
@@ -754,7 +775,6 @@ startBtn?.addEventListener('click', async () => {
     }
 
     updateStatus('Requesting camera and mic...');
-    // Lower initial resolution for faster connections
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
       video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 360 } }
@@ -768,7 +788,6 @@ startBtn?.addEventListener('click', async () => {
     if (camBtn) camBtn.textContent = '📷';
 
     updateStatus('Camera/mic enabled. Connecting to signaling server...');
-
     createSocket();
   } catch (err) {
     console.error('getUserMedia error:', err);
@@ -793,6 +812,16 @@ leaveBtn?.addEventListener('click', () => {
   }
   showControls(false);
   updateStatus('Left the call.');
+});
+
+/* Window resize: relayout grid */
+window.addEventListener('resize', () => {
+  layoutGrid();
+});
+
+/* Initial layout call */
+document.addEventListener('DOMContentLoaded', () => {
+  layoutGrid();
 });
 </script>
 </body>
