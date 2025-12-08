@@ -91,7 +91,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     .auth-card { max-width:420px; margin:20px auto; padding:18px; }
     .auth-actions { display:flex; gap:10px; flex-direction:column; }
-    @media(min-width:640px){ .auth-actions { flex-direction:row; } .auth-actions .btn { flex:1; } }
+    @media(min-width:640px){
+      .auth-actions { flex-direction:row; }
+      .auth-actions .btn { flex:1; }
+    }
+
     .btn-outline {
       display:inline-flex; align-items:center; justify-content:center;
       gap:8px; padding:10px 12px; border-radius:8px;
@@ -99,8 +103,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       text-decoration: none; font-weight: 600; cursor: pointer;
     }
     .btn-outline:hover { background: rgba(255,255,255,0.02); text-decoration: none; }
-    .secondary-actions { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
-    .secondary-actions .btn-outline { padding:8px 10px; font-size:0.95rem; }
+
+    /* Ensure secondary actions stack vertically on all viewports */
+    .secondary-actions {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:12px;
+      width:100%;
+    }
+    .secondary-actions .btn-outline {
+      padding:10px 12px;
+      font-size:0.95rem;
+      width:100%;
+      text-align:center;
+      box-sizing:border-box;
+    }
+
+    /* Keep layout consistent with site styles */
+    .input { width:100%; box-sizing:border-box; padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:inherit; }
+    .label { display:block; margin-bottom:6px; font-weight:600; }
+    .btn { padding:10px 14px; border-radius:8px; background:#e03b3b; color:#fff; border:none; cursor:pointer; font-weight:700; }
+    .card { background: rgba(0,0,0,0.45); border-radius:10px; padding:18px; color:inherit; }
+    .alert-error { background: rgba(255,0,0,0.08); color:#ffdddd; padding:10px; border-radius:6px; margin-bottom:12px; }
   </style>
 </head>
 <body>
@@ -123,10 +148,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <div class="auth-actions" style="margin-top:14px">
         <button class="btn" type="submit">Login</button>
-        <a class="btn-outline" href="/auth/forgot_password.php">Forgot password?</a>
       </div>
 
       <div class="secondary-actions">
+        <a class="btn-outline" href="/auth/forgot_password.php">Forgot password?</a>
         <a class="btn-outline" href="/auth/register.php">Create a new account</a>
       </div>
     </form>
