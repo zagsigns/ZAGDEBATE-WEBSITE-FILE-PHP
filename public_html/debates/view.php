@@ -20,10 +20,7 @@ if (!$debate) {
   exit;
 }
 
-/*
- * Settings must be loaded early because several derived variables
- * (free join limits, credits, etc.) depend on them.
- */
+/* Load settings */
 $settings = get_settings($pdo) ?: [];
 $access_mode = $settings['debate_access_mode'] ?? 'free';
 $credits_required = (int)($settings['credits_to_join'] ?? 0);
@@ -32,19 +29,19 @@ $free_join_limit = (int)($settings['free_join_limit'] ?? 0);
 $free_join_per_debate = (int)($settings['free_join_per_debate'] ?? 0);
 $free_join_time_minutes = (int)($settings['free_join_time_minutes'] ?? 0);
 
-/* Gallery JSON decode */
+/* Gallery decode */
 $gallery = [];
 if (!empty($debate['gallery_json'])) {
   $gallery = json_decode($debate['gallery_json'], true) ?: [];
 }
 
-/* Current user and roles */
+/* User context */
 $user = current_user();
 $isLoggedIn = $user && !empty($user['id']);
 $isAdmin = $isLoggedIn && is_admin($user);
 $isCreator = $isLoggedIn && ($debate['creator_id'] == $user['id']);
 
-/* Has the current user already joined this debate? */
+/* Joined check */
 $joined = false;
 if ($isLoggedIn) {
   $j = $pdo->prepare("SELECT id FROM debate_participants WHERE debate_id=? AND user_id=?");
@@ -52,7 +49,7 @@ if ($isLoggedIn) {
   $joined = (bool)$j->fetch();
 }
 
-/* Derived timing and counts used for free-join logic */
+/* Timing and counts */
 $createdAt = strtotime($debate['created_at']);
 $minutesSinceCreated = ($createdAt > 0) ? (time() - $createdAt) / 60 : PHP_INT_MAX;
 
@@ -69,25 +66,20 @@ if ($isLoggedIn) {
   $debateJoinedCount = (int)$debateJoinedStmt->fetchColumn();
 }
 
-/* Evaluate free join allowance once (safe defaults already set above) */
+/* Free join allowance */
 $freeJoinAllowed = (
   $userJoinedCount < $free_join_limit ||
   $debateJoinedCount < $free_join_per_debate ||
   $minutesSinceCreated <= $free_join_time_minutes
 );
 
-/* Success / error messages */
+/* Messages */
 $success = '';
 $error = '';
 
-/*
- * POST handling
- * Note: we reuse the counts and $freeJoinAllowed computed above.
- * After a successful join we update $joined and optionally counts/messages.
- */
+/* POST handling */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLoggedIn) {
   if ($_POST['action'] === 'join' && !$joined) {
-    // Re-evaluate freeJoinAllowed in case settings changed between requests
     $freeJoinAllowed = (
       $userJoinedCount < $free_join_limit ||
       $debateJoinedCount < $free_join_per_debate ||
@@ -95,17 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
     );
 
     if ($isAdmin || $isCreator || $access_mode !== 'credits' || $credits_required <= 0 || $freeJoinAllowed) {
-      // Free join path
       $ins = $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)");
       $ins->execute([$id, (int)$user['id']]);
       $success = 'Joined debate successfully (free access).';
       $joined = true;
-
-      // Update local counts for immediate UI feedback
       $debateJoinedCount++;
       $userJoinedCount++;
     } else {
-      // Credits path
       $wallet = $pdo->prepare("SELECT credits FROM wallets WHERE user_id=?");
       $wallet->execute([(int)$user['id']]);
       $userCredits = (int)$wallet->fetchColumn();
@@ -113,14 +101,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       if ($userCredits >= $credits_required) {
         $pdo->beginTransaction();
         try {
-          // Deduct credits safely
           $pdo->prepare("UPDATE wallets SET credits=credits-? WHERE user_id=? AND credits >= ?")
               ->execute([$credits_required, (int)$user['id'], $credits_required]);
 
-          // Add participant
           $pdo->prepare("INSERT INTO debate_participants (debate_id, user_id) VALUES (?, ?)")->execute([$id, (int)$user['id']]);
 
-          // Record spend and transfer creator share
           $usd_value = $credits_required * $credit_rate;
           $pdo->prepare("INSERT INTO debate_spend (debate_id, user_id, credits, usd_value) VALUES (?, ?, ?, ?)")
               ->execute([$id, (int)$user['id'], $credits_required, $usd_value]);
@@ -132,8 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
           $pdo->commit();
           $success = "Joined debate successfully. Spent $credits_required credits.";
           $joined = true;
-
-          // Update local counts for immediate UI feedback
           $debateJoinedCount++;
           $userJoinedCount++;
         } catch (Exception $e) {
@@ -156,12 +139,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <?php $meta_title = htmlspecialchars($debate['title']) . ' • Debate • ZAG DEBATE'; include __DIR__ . '/../seo/meta.php'; ?>
   <link rel="stylesheet" href="/assets/css/style.css">
   <style>
-    /* Video call UI improvements: fixed selfie, responsive grid, controls */
+    /* Video call UI: polished layout */
+    :root {
+      --call-bg: rgba(12,19,32,0.85);
+      --control-bg: rgba(255,255,255,0.04);
+    }
+
     /* Remote videos grid */
     #remoteVideos {
       display: grid;
@@ -169,15 +157,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       gap: 12px;
       margin-top: 12px;
     }
-    #remoteVideos .video-wrap {
+    .video-wrap {
       position: relative;
       overflow: hidden;
       border-radius: 12px;
       border: 1px solid var(--border);
       background: #000;
       box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      min-height: 140px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
-    #remoteVideos video {
+    .video-wrap video {
       width: 100%;
       height: 100%;
       display: block;
@@ -185,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       cursor: pointer;
       transition: transform .28s ease, box-shadow .28s ease;
     }
-    #remoteVideos .video-meta {
+    .video-meta {
       position: absolute;
       left: 8px;
       bottom: 8px;
@@ -198,10 +190,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       gap:8px;
       align-items:center;
     }
-    #remoteVideos video.zoomed {
+    .video-wrap.zoomed {
+      grid-column: 1 / -1;
+      height: 70vh;
+      z-index: 2500;
+    }
+    .video-wrap.zoomed video {
       transform: scale(1.02);
       box-shadow: 0 18px 40px rgba(0,0,0,0.6);
-      z-index: 2500;
     }
 
     /* Local selfie fixed box */
@@ -239,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       display:flex;
       gap:12px;
       z-index: 3500;
-      background: rgba(12,19,32,0.85);
+      background: var(--call-bg);
       padding: 8px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.04);
@@ -276,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       color: var(--muted);
     }
 
-    /* Responsive adjustments */
+    /* Responsive */
     @media (max-width: 900px) {
       #localVideo { width: 100px; height: 140px; bottom: 14px; right: 14px; }
       .call-controls { bottom: 14px; padding: 6px; gap:8px; }
@@ -287,6 +283,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $isLogge
       .call-controls { bottom: 12px; gap:6px; padding:6px; }
       .control-btn { padding:8px 10px; font-size:0.95rem; }
       #remoteVideos { grid-template-columns: 1fr; }
+    }
+
+    /* Small helper for empty state */
+    .video-empty {
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 18px;
+      text-align:center;
     }
   </style>
 </head>
@@ -309,7 +313,6 @@ if (!empty($debate['thumb_image'])) {
     <p style="margin-top:10px"><?= nl2br(htmlspecialchars($debate['description'])) ?></p>
 
 <?php
-// Ensure $validGallery is always defined
 $validGallery = [];
 foreach ($gallery as $g) {
   $galleryPath = __DIR__ . '/../' . ltrim($g, '/');
@@ -386,7 +389,7 @@ if (!empty($validGallery)): ?>
         <button class="btn" id="leaveBtn" style="margin-left:8px">Leave call</button>
       </div>
 
-      <!-- Floating control bar (will be shown once camera enabled) -->
+      <!-- Floating control bar (shown after enabling camera) -->
       <div id="callControls" class="call-controls" style="display:none" aria-hidden="true">
         <button id="muteBtn" class="control-btn" title="Mute / Unmute">🔇</button>
         <button id="camBtn" class="control-btn" title="Toggle Camera">📷</button>
@@ -398,7 +401,9 @@ if (!empty($validGallery)): ?>
       <video id="localVideo" autoplay muted playsinline></video>
 
       <!-- Remote videos grid -->
-      <div id="remoteVideos" class="grid" aria-live="polite" style="margin-top:12px"></div>
+      <div id="remoteVideos" class="grid" aria-live="polite" style="margin-top:12px">
+        <div class="video-empty">No participants yet. Enable camera & mic to join the call.</div>
+      </div>
 
       <div id="status" class="label" style="margin-top:8px">Ready. Click “Enable camera & mic”.</div>
     <?php else: ?>
@@ -414,6 +419,24 @@ if (!empty($validGallery)): ?>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
 <script>
+/*
+  Robust signaling + WebRTC logic.
+  Replace the inline script in view.php with this block (already placed).
+  If you have a TURN server, add credentials to ICE_SERVERS below.
+*/
+
+/* ICE servers: add TURN credentials here if available */
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  // Example TURN (uncomment and replace with your TURN server)
+  // {
+  //   urls: ['turn:turn.example.com:3478?transport=udp', 'turn:turn.example.com:3478?transport=tcp', 'turns:turn.example.com:5349?transport=tcp'],
+  //   username: 'TURN_USER',
+  //   credential: 'TURN_PASS'
+  // }
+];
+
 const signalingURL = 'https://zagdebate-signaling.onrender.com';
 const roomId = 'debate-' + <?= (int)$debate['id'] ?>;
 
@@ -435,7 +458,7 @@ const hangupBtn = document.getElementById('hangupBtn');
 
 let audioEnabled = true;
 let videoEnabled = true;
-let currentFacingMode = 'user'; // 'user' or 'environment'
+let currentFacingMode = 'user';
 
 function updateStatus(msg) {
   if (statusLabel) statusLabel.textContent = msg;
@@ -448,116 +471,274 @@ function showControls(show = true) {
   callControls.setAttribute('aria-hidden', show ? 'false' : 'true');
 }
 
-// Toggle mute/unmute
+/* Toggle mute/unmute */
 function toggleMute() {
   if (!localStream) return;
   const audioTracks = localStream.getAudioTracks();
   audioEnabled = !audioEnabled;
   audioTracks.forEach(t => t.enabled = audioEnabled);
-  muteBtn.textContent = audioEnabled ? '🔇' : '🔈';
-  muteBtn.classList.toggle('toggled', !audioEnabled);
+  if (muteBtn) {
+    muteBtn.textContent = audioEnabled ? '🔇' : '🔈';
+    muteBtn.classList.toggle('toggled', !audioEnabled);
+  }
 }
 
-// Toggle camera on/off
+/* Toggle camera */
 function toggleCamera() {
   if (!localStream) return;
   const videoTracks = localStream.getVideoTracks();
   videoEnabled = !videoEnabled;
   videoTracks.forEach(t => t.enabled = videoEnabled);
-  camBtn.textContent = videoEnabled ? '📷' : '🚫';
-  camBtn.classList.toggle('toggled', !videoEnabled);
+  if (camBtn) {
+    camBtn.textContent = videoEnabled ? '📷' : '🚫';
+    camBtn.classList.toggle('toggled', !videoEnabled);
+  }
 }
 
-// Switch camera (front/back) - best effort
+/* Switch camera (front/back) */
 async function switchCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
   currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: { exact: currentFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: { exact: currentFacingMode }, width: { ideal: 640 }, height: { ideal: 360 } }
     });
-    // Replace tracks in localStream and in peers
     const newVideoTrack = newStream.getVideoTracks()[0];
     const oldVideoTrack = localStream.getVideoTracks()[0];
     if (oldVideoTrack) oldVideoTrack.stop();
 
-    // Replace localStream reference
-    localStream.removeTrack(oldVideoTrack);
+    try { localStream.removeTrack(oldVideoTrack); } catch(e) {}
     localStream.addTrack(newVideoTrack);
 
-    // Update local video element
     localVideo.srcObject = null;
     localVideo.srcObject = localStream;
 
-    // Replace track in each peer connection
     Object.values(peers).forEach(p => {
       try {
-        const sender = p._pc && p._pc.getSenders && p._pc.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(newVideoTrack);
-      } catch (e) {
-        // ignore if not supported
-      }
+        const senders = p._pc && p._pc.getSenders && p._pc.getSenders();
+        if (senders) {
+          const sender = senders.find(s => s.track && s.track.kind === 'video');
+          if (sender) sender.replaceTrack(newVideoTrack);
+        }
+      } catch (e) {}
     });
 
     updateStatus('Camera switched.');
   } catch (err) {
-    // Fallback: try without exact constraint
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const oldVideoTrack = localStream.getVideoTracks()[0];
-      if (oldVideoTrack) oldVideoTrack.stop();
-      localStream.removeTrack(oldVideoTrack);
-      localStream.addTrack(newVideoTrack);
-      localVideo.srcObject = null;
-      localVideo.srcObject = localStream;
-      Object.values(peers).forEach(p => {
-        try {
-          const sender = p._pc && p._pc.getSenders && p._pc.getSenders().find(s => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(newVideoTrack);
-        } catch (e) {}
-      });
-      updateStatus('Camera switched (fallback).');
-    } catch (e) {
-      updateStatus('Could not switch camera: ' + e.message);
-    }
+    updateStatus('Could not switch camera: ' + err.message);
   }
 }
 
-// Toggle zoom for local selfie video
+/* Create socket with reconnection options */
+function createSocket() {
+  socket = io(signalingURL, {
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 3000,
+    timeout: 10000,
+    pingInterval: 20000,
+    pingTimeout: 5000
+  });
+
+  socket.on('connect', () => {
+    updateStatus('Connected to signaling server. Joining room...');
+    socket.emit('join-room', roomId);
+  });
+
+  socket.on('connect_error', err => {
+    updateStatus('Signaling connect error: ' + (err && err.message ? err.message : err));
+  });
+
+  socket.on('user-joined', id => {
+    updateStatus('Peer joined: ' + id);
+    if (!peers[id]) peers[id] = createPeer(id, true);
+  });
+
+  socket.on('signal', ({ signal, sender }) => {
+    if (!peers[sender]) peers[sender] = createPeer(sender, false);
+    try { peers[sender].signal(signal); } catch(e) { console.warn('signal apply error', e); }
+  });
+
+  socket.on('user-left', id => {
+    updateStatus('Peer left: ' + id);
+    destroyPeer(id);
+  });
+}
+
+/* Create a SimplePeer instance with timeouts and retries */
+function createPeer(id, initiator) {
+  const peer = new SimplePeer({
+    initiator,
+    trickle: true,
+    stream: localStream,
+    config: { iceServers: ICE_SERVERS }
+  });
+
+  peers[id] = peer;
+
+  peer.on('signal', signal => {
+    try {
+      socket?.emit('signal', { roomId, signal, target: id }, (ack) => {
+        if (!ack || ack.status !== 'ok') {
+          setTimeout(() => {
+            try { socket?.emit('signal', { roomId, signal, target: id }); } catch(e) {}
+          }, 800 + Math.random() * 400);
+        }
+      });
+    } catch (e) {
+      console.warn('emit signal error', e);
+    }
+  });
+
+  let connectTimer = setTimeout(() => {
+    if (!peer.connected) {
+      console.warn('Peer connection timeout for', id);
+      try { peer.destroy(); } catch(e) {}
+      delete peers[id];
+      setTimeout(() => { if (!peers[id]) peers[id] = createPeer(id, true); }, 700 + Math.random()*800);
+    }
+  }, 12000);
+
+  peer.on('connect', () => {
+    clearTimeout(connectTimer);
+    updateStatus('Peer connected: ' + id);
+  });
+
+  peer.on('stream', remoteStream => {
+    clearTimeout(connectTimer);
+    addRemoteVideo(id, remoteStream);
+    updateStatus('Received remote stream from ' + id);
+  });
+
+  peer.on('close', () => {
+    clearTimeout(connectTimer);
+    destroyPeer(id);
+  });
+
+  peer.on('error', err => {
+    clearTimeout(connectTimer);
+    console.warn('Peer error', id, err);
+  });
+
+  return peer;
+}
+
+function destroyPeer(id) {
+  const p = peers[id];
+  if (p) {
+    try { p.destroy(); } catch (e) {}
+    delete peers[id];
+  }
+  removeRemoteVideo(id);
+}
+
+function addRemoteVideo(id, stream) {
+  let wrap = document.getElementById('wrap-' + id);
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'wrap-' + id;
+    wrap.className = 'video-wrap';
+
+    const meta = document.createElement('div');
+    meta.className = 'video-meta';
+    meta.textContent = 'Participant';
+    wrap.appendChild(meta);
+
+    const video = document.createElement('video');
+    video.id = 'video-' + id;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('data-peer-id', id);
+    video.style.width = '100%';
+    video.style.height = '100%';
+    wrap.appendChild(video);
+
+    // remove placeholder if present
+    const placeholder = remoteVideos.querySelector('.video-empty');
+    if (placeholder) placeholder.remove();
+
+    remoteVideos.appendChild(wrap);
+  }
+  const videoEl = wrap.querySelector('video');
+  if (videoEl) {
+    videoEl.srcObject = stream;
+    tryAttachAudioIndicator(stream, 'wrap-' + id);
+  }
+}
+
+function removeRemoteVideo(id) {
+  const wrap = document.getElementById('wrap-' + id);
+  if (wrap) wrap.remove();
+  // if no participants left, show placeholder
+  if (!remoteVideos.querySelector('.video-wrap')) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'video-empty';
+    placeholder.textContent = 'No participants yet. Enable camera & mic to join the call.';
+    remoteVideos.appendChild(placeholder);
+  }
+}
+
+/* Basic audio activity visual (best-effort) */
+function tryAttachAudioIndicator(stream, wrapId) {
+  try {
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks || audioTracks.length === 0) return;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const wrap = document.getElementById(wrapId);
+    function tick() {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      if (wrap) {
+        wrap.style.boxShadow = avg > 20 ? '0 18px 40px rgba(16,185,129,0.18)' : '0 6px 18px rgba(0,0,0,0.35)';
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (e) { /* ignore */ }
+}
+
+/* UI interactions */
 localVideo?.addEventListener('click', () => {
   localVideo.classList.toggle('zoomed');
 });
 
-// Toggle zoom for remote videos (event delegation)
 remoteVideos?.addEventListener('click', e => {
   const v = e.target;
   if (v && v.tagName === 'VIDEO') {
-    v.classList.toggle('zoomed');
-    // If zoomed, unzoom other videos
-    if (v.classList.contains('zoomed')) {
-      document.querySelectorAll('#remoteVideos video').forEach(other => {
-        if (other !== v) other.classList.remove('zoomed');
+    const wrap = v.closest('.video-wrap');
+    if (!wrap) return;
+    const isZoomed = wrap.classList.toggle('zoomed');
+    if (isZoomed) {
+      document.querySelectorAll('#remoteVideos .video-wrap').forEach(other => {
+        if (other !== wrap) other.classList.remove('zoomed');
       });
-      // also unzoom local
       localVideo.classList.remove('zoomed');
     }
   }
 });
 
-// Attach control handlers
+remoteVideos?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target && e.target.tagName === 'VIDEO') {
+    e.target.classList.toggle('zoomed');
+  }
+});
+
 muteBtn?.addEventListener('click', toggleMute);
 camBtn?.addEventListener('click', toggleCamera);
 switchBtn?.addEventListener('click', switchCamera);
-hangupBtn?.addEventListener('click', () => {
-  // reuse leaveBtn logic
-  leaveBtn?.click();
-});
+hangupBtn?.addEventListener('click', () => leaveBtn?.click());
 
+/* Start / Leave */
 startBtn?.addEventListener('click', async () => {
   try {
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
@@ -573,48 +754,22 @@ startBtn?.addEventListener('click', async () => {
     }
 
     updateStatus('Requesting camera and mic...');
+    // Lower initial resolution for faster connections
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 360 } }
     });
-
-    // show controls
-    showControls(true);
-    // set initial control states
-    audioEnabled = true;
-    videoEnabled = true;
-    muteBtn.textContent = '🔇';
-    camBtn.textContent = '📷';
 
     localVideo.srcObject = localStream;
+    showControls(true);
+    audioEnabled = true;
+    videoEnabled = true;
+    if (muteBtn) muteBtn.textContent = '🔇';
+    if (camBtn) camBtn.textContent = '📷';
+
     updateStatus('Camera/mic enabled. Connecting to signaling server...');
 
-    socket = io(signalingURL, { transports: ['websocket'] });
-
-    socket.on('connect', () => {
-      updateStatus('Connected. Joining room...');
-      socket.emit('join-room', roomId);
-    });
-
-    socket.on('connect_error', err => {
-      updateStatus('Signaling error: ' + err.message);
-    });
-
-    socket.on('user-joined', id => {
-      updateStatus('Peer joined: ' + id);
-      if (!peers[id]) peers[id] = createPeer(id, true);
-    });
-
-    socket.on('signal', ({ signal, sender }) => {
-      if (!peers[sender]) peers[sender] = createPeer(sender, false);
-      peers[sender].signal(signal);
-    });
-
-    socket.on('user-left', id => {
-      updateStatus('Peer left: ' + id);
-      destroyPeer(id);
-    });
-
+    createSocket();
   } catch (err) {
     console.error('getUserMedia error:', err);
     updateStatus('Error: ' + err.message);
@@ -638,128 +793,6 @@ leaveBtn?.addEventListener('click', () => {
   }
   showControls(false);
   updateStatus('Left the call.');
-});
-
-function createPeer(id, initiator) {
-  const peer = new SimplePeer({
-    initiator,
-    trickle: false,
-    stream: localStream,
-    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-  });
-
-  // store underlying RTCPeerConnection for track replacement if available
-  peer.on('signal', signal => {
-    socket?.emit('signal', { roomId, signal, target: id });
-  });
-
-  peer.on('stream', remoteStream => {
-    addRemoteVideo(id, remoteStream);
-    updateStatus('Connected to peer: ' + id);
-  });
-
-  peer.on('close', () => removeRemoteVideo(id));
-  peer.on('error', err => {
-    console.warn('Peer error', id, err);
-    updateStatus('Peer error (' + id + '): ' + err.message);
-  });
-
-  // expose underlying pc if available (SimplePeer internal)
-  try {
-    if (peer._pc) peer._pc = peer._pc;
-  } catch (e) {}
-
-  peers[id] = peer;
-  return peer;
-}
-
-function destroyPeer(id) {
-  const p = peers[id];
-  if (p) {
-    try { p.destroy(); } catch (e) {}
-    delete peers[id];
-  }
-  removeRemoteVideo(id);
-}
-
-function addRemoteVideo(id, stream) {
-  // create wrapper
-  let wrap = document.getElementById('wrap-' + id);
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'wrap-' + id;
-    wrap.className = 'video-wrap';
-    // meta overlay
-    const meta = document.createElement('div');
-    meta.className = 'video-meta';
-    meta.textContent = 'Participant';
-    wrap.appendChild(meta);
-
-    const video = document.createElement('video');
-    video.id = 'video-' + id;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.setAttribute('data-peer-id', id);
-    video.style.width = '100%';
-    video.style.height = '100%';
-    wrap.appendChild(video);
-
-    remoteVideos.appendChild(wrap);
-  }
-  const videoEl = wrap.querySelector('video');
-  if (videoEl) videoEl.srcObject = stream;
-}
-
-function removeRemoteVideo(id) {
-  const wrap = document.getElementById('wrap-' + id);
-  if (wrap) wrap.remove();
-}
-
-// Optional: small visual pulse when someone speaks (basic)
-// Not a full VAD implementation; just a simple highlight when audio track exists
-function tryAttachAudioIndicator(stream, wrapId) {
-  try {
-    const audioTracks = stream.getAudioTracks();
-    if (!audioTracks || audioTracks.length === 0) return;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    src.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const wrap = document.getElementById(wrapId);
-    function tick() {
-      analyser.getByteFrequencyData(data);
-      let sum = 0;
-      for (let i = 0; i < data.length; i++) sum += data[i];
-      const avg = sum / data.length;
-      if (wrap) {
-        wrap.style.boxShadow = avg > 20 ? '0 18px 40px rgba(16,185,129,0.18)' : '0 6px 18px rgba(0,0,0,0.35)';
-      }
-      requestAnimationFrame(tick);
-    }
-    tick();
-  } catch (e) {
-    // ignore
-  }
-}
-
-// When a new remote stream is added, try to attach indicator
-// We call tryAttachAudioIndicator inside addRemoteVideo after setting srcObject
-// but since streams arrive asynchronously, we attach a small timeout to attempt
-const origAddRemoteVideo = addRemoteVideo;
-addRemoteVideo = function(id, stream) {
-  origAddRemoteVideo(id, stream);
-  setTimeout(() => {
-    tryAttachAudioIndicator(stream, 'wrap-' + id);
-  }, 500);
-};
-
-// Ensure remoteVideos is keyboard accessible: allow Enter to toggle zoom
-remoteVideos?.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target && e.target.tagName === 'VIDEO') {
-    e.target.classList.toggle('zoomed');
-  }
 });
 </script>
 </body>
