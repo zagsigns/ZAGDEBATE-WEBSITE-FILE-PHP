@@ -30,6 +30,45 @@ $debates = $pdo->query("SELECT d.*, u.name AS creator_name
 <head>
   <?php $meta_title = 'Manage Debates • ZAG DEBATE'; include __DIR__ . '/../seo/meta.php'; ?>
   <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    /* Layout */
+    .form-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .card { background: rgba(0,0,0,0.45); border-radius:10px; padding:18px; color:inherit; }
+
+    /* Primary red button */
+    .btn {
+      padding:10px 14px;
+      border-radius:8px;
+      background:#e03b3b;
+      color:#fff;
+      border:none;
+      cursor:pointer;
+      font-weight:700;
+      text-decoration:none;
+      display:inline-block;
+    }
+    .btn:hover { background:#c83232; }
+
+    /* Outline button */
+    .btn-outline {
+      padding:10px 14px;
+      border-radius:8px;
+      background:transparent;
+      color:inherit;
+      border:1px solid rgba(255,255,255,0.06);
+      text-decoration:none;
+      font-weight:600;
+      cursor:pointer;
+      display:inline-block;
+    }
+
+    /* Inline form reset so forms align with links/buttons */
+    form.inline { display:inline; margin:0; padding:0; }
+
+    /* Alerts */
+    .alert-success { background: rgba(0,128,0,0.08); color:#dff0d8; padding:10px; border-radius:6px; margin-bottom:12px; }
+    .alert-error { background: rgba(255,0,0,0.08); color:#ffdddd; padding:10px; border-radius:6px; margin-bottom:12px; }
+  </style>
 </head>
 <body>
 <?php include __DIR__ . '/../includes/header.php'; ?>
@@ -46,8 +85,8 @@ $debates = $pdo->query("SELECT d.*, u.name AS creator_name
   <?php foreach ($debates as $d): ?>
     <div class="card" style="margin-bottom:12px">
       <p>
-        <strong><?= htmlspecialchars($d['title']) ?></strong> 
-        • By <?= htmlspecialchars($d['creator_name']) ?> 
+        <strong><?= htmlspecialchars($d['title']) ?></strong>
+        • By <?= htmlspecialchars($d['creator_name']) ?>
         • Status: <?= htmlspecialchars($d['status']) ?>
       </p>
 
@@ -55,21 +94,35 @@ $debates = $pdo->query("SELECT d.*, u.name AS creator_name
         <!-- Update redirects to edit page -->
         <a class="btn" href="/debates/edit.php?id=<?= (int)$d['id'] ?>">Update</a>
 
-        <!-- Delete with confirmation -->
-        <form method="post" style="display:inline;margin-left:8px"
-              onsubmit="return confirm('Are you sure you want to delete this debate? This action cannot be undone.');">
+        <!-- Delete with unobtrusive confirmation (no inline onsubmit) -->
+        <form method="post" class="inline" data-action="delete" data-title="<?= htmlspecialchars($d['title'], ENT_QUOTES) ?>">
           <input type="hidden" name="id" value="<?= (int)$d['id'] ?>">
           <input type="hidden" name="action" value="delete">
-          <button class="btn-outline" type="submit">Delete</button>
+          <button class="btn" type="submit">Delete</button>
         </form>
 
-        <!-- View -->
-        <a class="btn-outline" style="margin-left:8px" 
-           href="/debates/view.php?id=<?= (int)$d['id'] ?>">View</a>
+        <!-- View styled like primary button -->
+        <a class="btn" href="/debates/view.php?id=<?= (int)$d['id'] ?>">View</a>
       </div>
     </div>
   <?php endforeach; ?>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Attach confirmation to delete forms that use data-action="delete"
+  document.querySelectorAll('form[data-action="delete"]').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      // Prefer the data-title attribute (escaped server-side) or fallback to nearby strong text
+      var title = form.getAttribute('data-title') || (form.closest('.card')?.querySelector('strong')?.textContent || 'this debate');
+      var confirmed = confirm('Are you sure you want to delete "' + title + '"? This action cannot be undone.');
+      if (!confirmed) {
+        e.preventDefault();
+      }
+    });
+  });
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 </body>
