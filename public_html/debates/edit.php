@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <input class="input" type="text" name="title" value="<?= htmlspecialchars($title) ?>" required>
 
     <label class="label">Description</label>
-    <textarea class="input" name="description" rows="6" required><?= htmlspecialchars($description) ?></textarea>
+    <textarea class="input" name="description" rows="6" ><?= htmlspecialchars($description) ?></textarea>
 
     <!-- Optional batch delete (processed on Save) -->
     <?php if (!empty($thumb)): ?>

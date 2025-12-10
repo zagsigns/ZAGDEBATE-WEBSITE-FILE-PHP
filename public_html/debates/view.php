@@ -15,6 +15,84 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/app.php';
 
+
+// --- Delete handler: must run before any output or debate fetch ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_debate') {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+
+    $delId = (int)($_POST['debate_id'] ?? 0);
+    if ($delId <= 0) {
+        $_SESSION['flash_error'] = 'Invalid debate id.';
+        header('Location: /debates/list.php');
+        exit;
+    }
+
+    $user = function_exists('current_user') ? current_user() : ($_SESSION['user'] ?? null);
+    if (empty($user['id'])) {
+        $_SESSION['flash_error'] = 'You must be logged in to delete a debate.';
+        header('Location: /auth/login.php');
+        exit;
+    }
+
+    $q = $pdo->prepare("SELECT id, creator_id, thumb_image, gallery_json FROM debates WHERE id = ? LIMIT 1");
+    $q->execute([$delId]);
+    $row = $q->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        $_SESSION['flash_error'] = 'Debate not found.';
+        header('Location: /debates/list.php');
+        exit;
+    }
+
+    $isOwner = ((int)$row['creator_id'] === (int)$user['id']);
+    $isAdminUser = function_exists('is_admin') && is_admin($user);
+    if (!($isOwner || $isAdminUser)) {
+        $_SESSION['flash_error'] = 'You are not authorized to delete this debate.';
+        header('Location: /debates/view.php?id=' . $delId);
+        exit;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare("DELETE FROM chat_messages WHERE debate_id = ?")->execute([$delId]);
+        $pdo->prepare("DELETE FROM debate_participants WHERE debate_id = ?")->execute([$delId]);
+        $pdo->prepare("DELETE FROM debate_spend WHERE debate_id = ?")->execute([$delId]);
+        $pdo->prepare("DELETE FROM webrtc_signals WHERE room = ? OR room = ?")->execute(['debate_' . $delId, (string)$delId]);
+        $pdo->prepare("DELETE FROM debates WHERE id = ? LIMIT 1")->execute([$delId]);
+        $pdo->commit();
+
+        // best-effort file cleanup
+        if (!empty($row['thumb_image'])) {
+            $local = __DIR__ . '/../' . ltrim($row['thumb_image'], '/');
+            if (file_exists($local)) @unlink($local);
+        }
+        if (!empty($row['gallery_json'])) {
+            $g = json_decode($row['gallery_json'], true);
+            if (is_array($g)) {
+                foreach ($g as $p) {
+                    $local = __DIR__ . '/../' . ltrim($p, '/');
+                    if (file_exists($local)) @unlink($local);
+                }
+            }
+        }
+
+        $_SESSION['flash_success'] = 'Debate deleted successfully.';
+        header('Location: /debates/list.php');
+        exit;
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('Delete debate error: ' . $e->getMessage());
+        $_SESSION['flash_error'] = 'Failed to delete debate. Please try again later.';
+        header('Location: /debates/view.php?id=' . $delId);
+        exit;
+    }
+}
+// --- end delete handler ---
+
+
+
+
+
+
 // Ensure session is started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -45,6 +123,9 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$id]);
 $debate = $stmt->fetch(PDO::FETCH_ASSOC);
+// Ensure description is always a string to avoid PHP 8.1+ deprecation warnings
+$debate_description = isset($debate['description']) ? (string)$debate['description'] : '';
+
 if (!$debate) {
     http_response_code(404);
     echo 'Debate not found';
@@ -363,7 +444,9 @@ if ($isLoggedIn && !$joined) {
 
 /* Share metadata */
 $debateTitle = trim($debate['title']);
-$debateDesc = trim(mb_substr(strip_tags($debate['description']), 0, 200));
+// Safe meta description (use normalized description)
+$debateDesc = trim(mb_substr(strip_tags($debate_description), 0, 200));
+
 $siteBase = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'zagdebate.com');
 $debateUrl = $siteBase . '/debates/view.php?id=' . (int)$debate['id'];
 $debateImage = !empty($debate['thumb_image']) ? (strpos($debate['thumb_image'], 'http') === 0 ? $debate['thumb_image'] : $siteBase . $debate['thumb_image']) : $siteBase . '/assets/img/default_thumb.jpg';
@@ -484,7 +567,42 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
           <img class="debate-thumb" src="<?= htmlspecialchars($debateImage) ?>" alt="Thumb">
       <?php endif; endif; ?>
 
-      <p style="margin-top:12px; line-height:1.6; color:rgba(255,255,255,0.9);"><?= nl2br(htmlspecialchars($debate['description'])) ?></p>
+      <p style="margin-top:12px; line-height:1.6; color:rgba(255,255,255,0.9);"><?= nl2br(htmlspecialchars($debate_description, ENT_QUOTES, 'UTF-8')) ?></p>
+      
+      
+      
+
+
+
+<?php if ($isLoggedIn && ($isCreator || $isAdmin)): ?>
+  <div class="edit-action" style="margin-top:18px; margin-bottom:10px; display:flex; gap:8px; align-items:center;">
+    <a href="/debates/edit.php?id=<?= (int)$debate['id'] ?>"
+       class="btn"
+       role="button"
+       aria-label="Edit debate"
+       style="background:#e03b3b; color:#fff; border:none; display:inline-flex; gap:8px; align-items:center; padding:10px 14px; border-radius:10px; font-weight:700;">
+      <span style="font-size:16px">✏️</span> Edit
+    </a>
+
+    <form method="post" style="display:inline;" onsubmit="return confirm('Delete this debate? This cannot be undone.');">
+      <input type="hidden" name="action" value="delete_debate">
+      <input type="hidden" name="debate_id" value="<?= (int)$debate['id'] ?>">
+      <button type="submit"
+              class="btn"
+              style="background:#e03b3b; color:#fff; border:none; display:inline-flex; gap:8px; align-items:center; padding:10px 14px; border-radius:10px; font-weight:700;"
+              aria-label="Delete debate">
+        <span style="font-size:16px">🗑️</span> Delete
+      </button>
+    </form>
+  </div>
+<?php endif; ?>
+
+
+
+
+
+
+
 
       <div class="share-row">
         <button class="share-btn primary" id="shareBtn" type="button" title="Share this debate"><span style="font-size:16px">📤</span> Share</button>
