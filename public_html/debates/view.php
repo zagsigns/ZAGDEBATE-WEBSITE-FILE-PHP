@@ -612,6 +612,45 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
       <?php if (!empty($success)): ?><div class="alert alert-success" style="margin-top:12px"><?= htmlspecialchars($success) ?></div><?php endif; ?>
       <?php if (!empty($error)): ?><div class="alert alert-error" style="margin-top:12px"><?= htmlspecialchars($error) ?></div><?php endif; ?>
     </div>
+    
+    
+        <!-- Video call -->
+    <div class="card">
+      <h3>Group video call</h3>
+      <p class="label">Join with camera and mic to participate in the live group call. Click any tile to zoom it.</p>
+
+      <?php if ($joined && $isLoggedIn): ?>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px; align-items:center;">
+          <button class="btn" id="startBtn" type="button">Enable camera & mic</button>
+          <button class="btn" id="leaveBtn" type="button" style="display:none">Leave call</button>
+          <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+            <button id="muteBtn" class="control-btn primary" title="Mute / Unmute">🔇</button>
+            <button id="camBtn" class="control-btn primary" title="Toggle Camera">📷</button>
+            <button id="hangupBtn" class="control-btn danger" title="Leave call">📴</button>
+          </div>
+        </div>
+
+        <div style="position:relative;margin-top:14px">
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div style="flex:1">
+              <div id="remoteVideos" class="video-stage" aria-live="polite">
+                <div class="video-empty">No participants yet. Enable camera & mic to join the call.</div>
+              </div>
+            </div>
+
+            <div id="selfTile" class="self-tile" title="Click to zoom your video" style="display:none">
+              <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+          </div>
+        </div>
+
+        <div id="status" class="label" style="margin-top:12px">Ready. Click "Enable camera & mic".</div>
+      <?php else: ?>
+        <p class="label">Join the debate to enable video calls.</p>
+      <?php endif; ?>
+    </div>
+    
+    
 
     <!-- Chat -->
     <div class="card" id="chat">
@@ -672,41 +711,7 @@ $chatMessages = $messages->fetchAll(PDO::FETCH_ASSOC);
       </div>
     </div>
 
-    <!-- Video call -->
-    <div class="card">
-      <h3>Group video call</h3>
-      <p class="label">Join with camera and mic to participate in the live group call. Click any tile to zoom it.</p>
 
-      <?php if ($joined && $isLoggedIn): ?>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px; align-items:center;">
-          <button class="btn" id="startBtn" type="button">Enable camera & mic</button>
-          <button class="btn" id="leaveBtn" type="button" style="display:none">Leave call</button>
-          <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-            <button id="muteBtn" class="control-btn primary" title="Mute / Unmute">🔇</button>
-            <button id="camBtn" class="control-btn primary" title="Toggle Camera">📷</button>
-            <button id="hangupBtn" class="control-btn danger" title="Leave call">📴</button>
-          </div>
-        </div>
-
-        <div style="position:relative;margin-top:14px">
-          <div style="display:flex;gap:12px;align-items:flex-start">
-            <div style="flex:1">
-              <div id="remoteVideos" class="video-stage" aria-live="polite">
-                <div class="video-empty">No participants yet. Enable camera & mic to join the call.</div>
-              </div>
-            </div>
-
-            <div id="selfTile" class="self-tile" title="Click to zoom your video" style="display:none">
-              <video id="localVideo" autoplay muted playsinline></video>
-            </div>
-          </div>
-        </div>
-
-        <div id="status" class="label" style="margin-top:12px">Ready. Click "Enable camera & mic".</div>
-      <?php else: ?>
-        <p class="label">Join the debate to enable video calls.</p>
-      <?php endif; ?>
-    </div>
 
   </div>
 
